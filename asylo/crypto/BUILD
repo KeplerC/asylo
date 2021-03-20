@@ -725,7 +725,6 @@ cc_test(
 
 cc_library(
     name = "fake_signing_key",
-    testonly = 1,
     srcs = ["fake_signing_key.cc"],
     hdrs = ["fake_signing_key.h"],
     copts = ASYLO_DEFAULT_COPTS,
