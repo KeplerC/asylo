@@ -566,7 +566,7 @@ cc_library(
     srcs = ["signing_key.cc"],
     hdrs = ["signing_key.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":algorithms_cc_proto",
         ":keys_cc_proto",
@@ -585,6 +585,7 @@ cc_library(
     name = "ecdsa_signing_key",
     srcs = ["ecdsa_signing_key.cc"],
     hdrs = ["ecdsa_signing_key.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":algorithms_cc_proto",
         ":bignum_util",
@@ -635,7 +636,7 @@ cc_library(
     name = "ecdsa_p256_sha256_signing_key",
     hdrs = ["ecdsa_p256_sha256_signing_key.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":algorithms_cc_proto",
         ":ecdsa_signing_key",
@@ -690,7 +691,7 @@ cc_library(
     srcs = ["fake_certificate.cc"],
     hdrs = ["fake_certificate.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":certificate_cc_proto",
         ":certificate_interface",
@@ -728,7 +729,7 @@ cc_library(
     srcs = ["fake_signing_key.cc"],
     hdrs = ["fake_signing_key.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":algorithms_cc_proto",
         ":keys_cc_proto",
