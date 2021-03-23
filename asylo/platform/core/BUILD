@@ -21,7 +21,7 @@ load("//asylo/bazel:copts.bzl", "ASYLO_DEFAULT_COPTS")
 licenses(["notice"])
 
 package(
-    default_visibility = ["//asylo:implementation"],
+    default_visibility = ["//visibility:public"],
 )
 
 # Core untrusted Asylo components.
