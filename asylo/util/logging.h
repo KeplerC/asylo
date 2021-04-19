@@ -104,7 +104,7 @@
 
 /// Severity level definitions. These represent the four severity levels INFO
 /// through FATAL.
-enum LogSeverity { INFO, WARNING, ERROR, FATAL, QFATAL };
+enum LogSeverity { NONE, INFO, WARNING, ERROR, FATAL, QFATAL };
 
 namespace asylo {
 

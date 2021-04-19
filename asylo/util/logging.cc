@@ -166,7 +166,7 @@ LogMessage::LogMessage(const char *file, int line, const std::string &result) {
   stream() << "Check failed: " << result << " ";
 }
 
-static constexpr const char *LogSeverityNames[5] = {"INFO", "WARNING", "ERROR",
+static constexpr const char *LogSeverityNames[6] = {"NONE", "INFO", "WARNING", "ERROR",
                                                     "FATAL", "QFATAL"};
 
 void LogMessage::Init(const char *file, int line, LogSeverity severity) {
@@ -177,6 +177,9 @@ void LogMessage::Init(const char *file, int line, LogSeverity severity) {
   severity_ = severity;
   if (severity_ == FATAL || severity_ == QFATAL) {
     log_panic = true;
+  }
+  if(severity_ == NONE){
+    return;
   }
 
   const char *filename = GetBasename(file);
