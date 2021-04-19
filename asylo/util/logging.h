@@ -29,7 +29,7 @@
 #include "absl/base/optimization.h"
 
 /// \cond Internal
-#define COMPACT_ASYLO_LOG_INFO ::asylo::LogMessage(__FILE__, __LINE__)
+#define COMPACT_ASYLO_LOG_NONE ::asylo::LogMessage(__FILE__, __LINE__)
 #define COMPACT_ASYLO_LOG_INFO ::asylo::LogMessage(__FILE__, __LINE__)
 #define COMPACT_ASYLO_LOG_WARNING \
   ::asylo::LogMessage(__FILE__, __LINE__, WARNING)
