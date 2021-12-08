@@ -31,7 +31,7 @@ licenses(["notice"])
 proto_library(
     name = "pck_certificates_proto",
     srcs = ["pck_certificates.proto"],
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":tcb_proto",
         "//asylo/crypto:certificate_proto",
@@ -40,38 +40,38 @@ proto_library(
 
 cc_proto_library(
     name = "pck_certificates_cc_proto",
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [":pck_certificates_proto"],
 )
 
 proto_library(
     name = "platform_provisioning_proto",
     srcs = ["platform_provisioning.proto"],
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
 )
 
 cc_proto_library(
     name = "platform_provisioning_cc_proto",
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [":platform_provisioning_proto"],
 )
 
 proto_library(
     name = "sgx_pcs_client_proto",
     srcs = ["sgx_pcs_client.proto"],
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
 )
 
 cc_proto_library(
     name = "sgx_pcs_client_cc_proto",
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [":sgx_pcs_client_proto"],
 )
 
 proto_library(
     name = "tcb_proto",
     srcs = ["tcb.proto"],
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":platform_provisioning_proto",
         "//asylo/identity/platform/sgx:machine_configuration_proto",
@@ -81,7 +81,7 @@ proto_library(
 
 cc_proto_library(
     name = "tcb_cc_proto",
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [":tcb_proto"],
 )
 
@@ -125,7 +125,7 @@ cc_library(
     srcs = ["fake_sgx_pcs_client.cc"],
     hdrs = ["fake_sgx_pcs_client.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":container_util",
         ":fake_sgx_pki",
@@ -219,7 +219,7 @@ cc_library(
     srcs = ["fake_sgx_pki.cc"],
     hdrs = ["fake_sgx_pki.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":pck_certificate_util",
         "//asylo/crypto:certificate_cc_proto",
@@ -257,7 +257,7 @@ cc_library(
     testonly = 1,
     hdrs = ["mock_sgx_pcs_client.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":platform_provisioning_cc_proto",
         ":sgx_pcs_client",
@@ -272,7 +272,7 @@ cc_library(
     srcs = ["pck_certificate_util.cc"],
     hdrs = ["pck_certificate_util.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":container_util",
         ":pck_certificates_cc_proto",
@@ -361,7 +361,7 @@ cc_library(
     srcs = ["pck_certs_from_json.cc"],
     hdrs = ["pck_certs_from_json.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":pck_certificates_cc_proto",
         ":platform_provisioning_cc_proto",
@@ -409,7 +409,7 @@ cc_library(
     srcs = ["platform_provisioning.cc"],
     hdrs = ["platform_provisioning.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":platform_provisioning_cc_proto",
         "//asylo/crypto/util:trivial_object_util",
@@ -444,7 +444,7 @@ cc_library(
     name = "sgx_pcs_client",
     hdrs = ["sgx_pcs_client.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":pck_certificates_cc_proto",
         ":platform_provisioning_cc_proto",
@@ -461,7 +461,7 @@ cc_library(
     srcs = ["sgx_pcs_client_impl.cc"],
     hdrs = ["sgx_pcs_client_impl.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":pck_certs_from_json",
         ":platform_provisioning",
@@ -693,7 +693,7 @@ cc_library(
     srcs = ["tcb_info_from_json.cc"],
     hdrs = ["tcb_info_from_json.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":container_util",
         ":platform_provisioning",
