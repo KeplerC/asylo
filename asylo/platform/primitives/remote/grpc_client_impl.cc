@@ -33,7 +33,6 @@
 #include "asylo/platform/primitives/remote/grpc_service.pb.h"
 #include "asylo/platform/primitives/remote/metrics/clients/opencensus_client.h"
 #include "asylo/platform/primitives/util/message.h"
-#include "asylo/util/posix_error_space.h"
 #include "asylo/util/remote/remote_proxy_config.h"
 #include "asylo/util/status.h"
 #include "asylo/util/status_helpers.h"
@@ -147,7 +146,7 @@ Communicator::ClientImpl::Create(const RemoteProxyConfig &config,
         client_config.GetOpenCensusMetricsConfig();
     if (config_result.ok()) {
       client->open_census_client_ = OpenCensusClient::Create(
-          client->grpc_channel_, config_result.ValueOrDie());
+          client->grpc_channel_, config_result.value());
     }
   }
 
@@ -176,7 +175,7 @@ Status Communicator::ClientImpl::SendCommunication(
     communicator_->set_host_time_nanos(confirmation.host_time_nanos());
   }
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 void Communicator::ClientImpl::SendDisconnect() {

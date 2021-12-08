@@ -35,7 +35,7 @@
 #include "asylo/platform/posix/io/io_context_inotify.h"
 #include "asylo/platform/posix/io/native_paths.h"
 #include "asylo/platform/posix/io/util.h"
-#include "asylo/util/posix_error_space.h"
+#include "asylo/util/posix_errors.h"
 #include "asylo/util/statusor.h"
 
 namespace asylo {
@@ -536,11 +536,11 @@ template <typename IOAction, typename ReturnType>
 ReturnType IOManager::CallWithHandler(const char *path, IOAction action) {
   StatusOr<std::string> status = CanonicalizePath(path);
   if (!status.ok()) {
-    errno = status.status().error_code();
+    errno = GetErrno(status.status());
     return ErrorValue<ReturnType>::value;
   }
 
-  absl::string_view canonical_path = status.ValueOrDie();
+  absl::string_view canonical_path = status.value();
   VirtualPathHandler *handler = HandlerForPath(canonical_path);
   if (handler) {
     // Invoke the path handler if one is installed.
@@ -556,17 +556,17 @@ ReturnType IOManager::CallWithHandler(const char *path1, const char *path2,
                                       IOAction action) {
   StatusOr<std::string> status1 = CanonicalizePath(path1);
   if (!status1.ok()) {
-    errno = status1.status().error_code();
+    errno = GetErrno(status1.status());
     return ErrorValue<ReturnType>::value;
   }
   StatusOr<std::string> status2 = CanonicalizePath(path2);
   if (!status2.ok()) {
-    errno = status2.status().error_code();
+    errno = GetErrno(status2.status());
     return ErrorValue<ReturnType>::value;
   }
 
-  absl::string_view canonical_path1 = status1.ValueOrDie();
-  absl::string_view canonical_path2 = status2.ValueOrDie();
+  absl::string_view canonical_path1 = status1.value();
+  absl::string_view canonical_path2 = status2.value();
   VirtualPathHandler *handler1 = HandlerForPath(canonical_path1);
   VirtualPathHandler *handler2 = HandlerForPath(canonical_path2);
   if (handler1 != handler2) {
@@ -609,7 +609,7 @@ Status IOManager::SetCurrentWorkingDirectory(absl::string_view path) {
   StatusOr<std::string> working_directory = CanonicalizePath(path);
   Status status = working_directory.status();
   if (status.ok()) {
-    current_working_directory_ = working_directory.ValueOrDie();
+    current_working_directory_ = working_directory.value();
   }
 
   return status;
@@ -623,8 +623,7 @@ StatusOr<std::string> IOManager::CanonicalizePath(
     absl::string_view path) const {
   // Cannot resolve an empty path.
   if (path.empty()) {
-    return Status(error::PosixError::P_ENOENT,
-                  "Cannot canonicalize empty path");
+    return PosixError(ENOENT, "Cannot canonicalize empty path");
   }
 
   // In some cases, the handler may be restricted for a given path.
@@ -639,8 +638,8 @@ StatusOr<std::string> IOManager::CanonicalizePath(
     // If the current working directory has not yet been set, cannot
     // canonicalize relative paths.
     if (working_directory.empty()) {
-      return Status(error::PosixError::P_ENOENT,
-                    "Canonicalization of relative path before initialization");
+      return PosixError(
+          ENOENT, "Canonicalization of relative path before initialization");
     }
 
     // Prepend the working directory to the given path. Don't worry about
@@ -659,8 +658,7 @@ StatusOr<std::string> IOManager::CanonicalizePath(
   // If the allowed handler for this path is restricted, check that it matches
   // the requirement.
   if (required_handler && HandlerForPath(ret) != required_handler) {
-    return Status(error::PosixError::P_EACCES,
-                  "Relative path resolution across access domains");
+    return PosixError(EACCES, "Relative path resolution across access domains");
   }
 
   return ret;
@@ -682,11 +680,11 @@ int IOManager::Chown(const char *path, uid_t owner, gid_t group) {
 char *IOManager::RealPath(const char *path, char *resolved_path) {
   StatusOr<std::string> path_str_or = CanonicalizePath(path);
   if (!path_str_or.ok()) {
-    errno = path_str_or.status().error_code();
+    errno = GetErrno(path_str_or.status());
 
     return nullptr;
   }
-  std::string path_str = path_str_or.ValueOrDie();
+  std::string path_str = path_str_or.value();
   if (resolved_path) {
     snprintf(resolved_path, PATH_MAX, "%s", path_str.c_str());
     return resolved_path;

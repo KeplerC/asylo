@@ -53,7 +53,7 @@ cc_library(
 
 # Trusted runtime components for SGX.
 _TRUSTED_SGX_BACKEND_DEPS = [
-    ":sgx_error_space",
+    ":sgx_errors",
     ":trusted_sgx_bridge",
     "//asylo:enclave_cc_proto",
     "//asylo/util:logging",
@@ -120,6 +120,7 @@ cc_library(
         no_match_error = "Trusted SGX components must be built with an SGX backend selected",
     ) + [
         ":sgx_params",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "//asylo/util:lock_guard",
         "//asylo/platform/primitives/util:message_reader_writer",
@@ -148,7 +149,7 @@ cc_library(
         ":exit_handlers",
         ":fork_cc_proto",
         ":loader_cc_proto",
-        ":sgx_error_space",
+        ":sgx_errors",
         ":sgx_params",
         "//asylo:enclave_cc_proto",
         "//asylo/platform/common:memory",
@@ -162,6 +163,7 @@ cc_library(
         "//asylo/util:file_mapping",
         "//asylo/util:function_deleter",
         "//asylo/util:logging",
+        "//asylo/util:posix_errors",
         "//asylo/util:status",
         "//asylo/util:status_helpers",
         "//asylo/util:status_macros",
@@ -175,14 +177,27 @@ cc_library(
     ],
 )
 
-# An error space for SGX.
+proto_library(
+    name = "sgx_error_code_proto",
+    srcs = ["sgx_error_code.proto"],
+)
+
+cc_proto_library(
+    name = "sgx_error_code_cc_proto",
+    deps = [":sgx_error_code_proto"],
+)
+
 cc_library(
-    name = "sgx_error_space",
-    srcs = ["sgx_error_space.cc"],
-    hdrs = ["sgx_error_space.h"],
+    name = "sgx_error_matchers",
+    testonly = 1,
+    srcs = ["sgx_error_matchers.cc"],
+    hdrs = ["sgx_error_matchers.h"],
     copts = ASYLO_DEFAULT_COPTS,
     deps = [
+        ":sgx_errors",
+        "//asylo/test/util:status_matchers",
         "//asylo/util:status",
+        "@com_google_googletest//:gtest",
         "@linux_sgx//:public",
     ],
 )
@@ -193,9 +208,13 @@ cc_library(
     hdrs = ["sgx_errors.h"],
     copts = ASYLO_DEFAULT_COPTS,
     deps = [
-        ":sgx_error_space",
+        ":sgx_error_code_cc_proto",
         "//asylo/util:status",
+        "//asylo/util:status_helpers",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:cord",
+        "@com_google_absl//absl/types:optional",
         "@linux_sgx//:public",
     ],
 )
@@ -206,6 +225,7 @@ cc_test(
     copts = ASYLO_DEFAULT_COPTS,
     enclave_test_name = "sgx_errors_enclave_test",
     deps = [
+        ":sgx_error_matchers",
         ":sgx_errors",
         "//asylo/test/util:status_matchers",
         "//asylo/test/util:test_main",
@@ -296,7 +316,6 @@ _TRUSTED_FORK_HW_DEPS = [
     "//asylo/crypto/util:byte_container_view",
     "//asylo/crypto/util:trivial_object_util",
     "//asylo/platform/posix/memory:memory",
-    "//asylo/platform/primitives/sgx:sgx_error_space",
     "//asylo/util:logging",
     "//asylo/grpc/auth/core:client_ekep_handshaker",
     "//asylo/grpc/auth/core:server_ekep_handshaker",
@@ -308,6 +327,7 @@ _TRUSTED_FORK_HW_DEPS = [
     "//asylo/identity/platform/sgx:sgx_identity_util",
     "//asylo/util:cleansing_types",
     "//asylo/util:cleanup",
+    "//asylo/util:posix_errors",
     "@boringssl//:crypto",
 ]
 

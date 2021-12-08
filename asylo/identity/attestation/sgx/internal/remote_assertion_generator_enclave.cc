@@ -37,6 +37,8 @@
 #include "asylo/identity/platform/sgx/internal/self_identity.h"
 #include "asylo/identity/platform/sgx/internal/sgx_identity_util_internal.h"
 #include "asylo/identity/provisioning/sgx/internal/platform_provisioning.h"
+#include "asylo/util/status.h"
+#include "asylo/util/status_helpers.h"
 #include "asylo/util/status_macros.h"
 
 namespace asylo {
@@ -61,7 +63,7 @@ Status RemoteAssertionGeneratorEnclave::Initialize(
     return absl::InvalidArgumentError(
         "EnclaveConfig does not include a server address");
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status RemoteAssertionGeneratorEnclave::Run(const EnclaveInput &input,
@@ -94,7 +96,7 @@ Status RemoteAssertionGeneratorEnclave::Run(const EnclaveInput &input,
     case RemoteAssertionGeneratorEnclaveInput::kGetEnclaveIdentityInput:
       SetSelfSgxIdentity(enclave_output->mutable_get_enclave_identity_output()
                              ->mutable_sgx_identity());
-      return Status::OkStatus();
+      return absl::OkStatus();
     default:
       return absl::InvalidArgumentError(
           "EnclaveInput invalid: did not contain a valid input");
@@ -109,7 +111,7 @@ Status RemoteAssertionGeneratorEnclave::Finalize(
     server_service_pair_locked->server->Shutdown();
     server_service_pair_locked->server = nullptr;
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status RemoteAssertionGeneratorEnclave::StartRemoteAssertionGeneratorGrpcServer(
@@ -145,7 +147,7 @@ Status RemoteAssertionGeneratorEnclave::StartRemoteAssertionGeneratorGrpcServer(
       server_service_pair_locked->server,
       CreateAndStartServer(remote_assertion_generator_server_address_,
                            server_service_pair_locked->service.get()));
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status RemoteAssertionGeneratorEnclave::GeneratePceInfoSgxHardwareReport(
@@ -170,7 +172,7 @@ Status RemoteAssertionGeneratorEnclave::GeneratePceInfoSgxHardwareReport(
   output->mutable_report()->set_value(
       ConvertTrivialObjectToBinaryString(report));
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status RemoteAssertionGeneratorEnclave::GenerateKeyAndCsr(
@@ -202,7 +204,7 @@ Status RemoteAssertionGeneratorEnclave::GenerateKeyAndCsr(
 
   auto attestation_key_certs_pair_locked = attestation_key_certs_pair_.Lock();
   attestation_key_certs_pair_locked->attestation_key = std::move(signing_key);
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status RemoteAssertionGeneratorEnclave::UpdateCerts(
@@ -222,12 +224,11 @@ Status RemoteAssertionGeneratorEnclave::UpdateCerts(
   if (input.validate_certificate_chains()) {
     // Verify that all certificate chains are valid and that they certify the
     // current attestation key before saving them.
-    Status status = CheckCertificateChainsForAttestationPublicKey(
-        *attestation_public_key, input.certificate_chains(),
-        *GetSgxCertificateFactories(), verification_config_);
-    if (!status.ok()) {
-      return status.WithPrependedContext("Cannot update certificates");
-    }
+    ASYLO_RETURN_IF_ERROR(
+        WithContext(CheckCertificateChainsForAttestationPublicKey(
+                        *attestation_public_key, input.certificate_chains(),
+                        *GetSgxCertificateFactories(), verification_config_),
+                    "Cannot update certificates"));
   }
 
   if (input.output_sealed_secret()) {
@@ -247,7 +248,7 @@ Status RemoteAssertionGeneratorEnclave::UpdateCerts(
         std::move(attestation_key_certs_pair_locked->attestation_key),
         attestation_key_certs_pair_locked->certificate_chains);
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 }  // namespace sgx

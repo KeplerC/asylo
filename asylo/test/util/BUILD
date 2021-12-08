@@ -111,8 +111,10 @@ cc_library(
         "//asylo:enclave_client",
         "//asylo/platform/primitives/sgx:loader_cc_proto",
         "//asylo/util:logging",
+        "//asylo/util:posix_errors",
         "//asylo/util:status",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -325,6 +327,9 @@ cc_library(
     copts = ASYLO_DEFAULT_COPTS,
     visibility = ["//visibility:public"],
     deps = [
+        "//asylo/util:logging",
+        "@com_google_absl//absl/random",
+        "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest",
     ],

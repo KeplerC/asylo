@@ -54,7 +54,7 @@
 #include "asylo/identity/provisioning/sgx/internal/sgx_pcs_client_impl.h"
 #include "asylo/util/cleansing_types.h"
 #include "asylo/util/http_fetcher_impl.h"
-#include "asylo/util/posix_error_space.h"
+#include "asylo/util/posix_errors.h"
 #include "asylo/util/proto_parse_util.h"
 #include "asylo/util/status.h"
 #include "asylo/util/status_macros.h"
@@ -120,13 +120,6 @@ QOhTsiedSrnAdyGN/4fy3ryM7xfft0kL0fJuMAsaDk527RH89elWsn2/x20Kk4yl
 NVOFBkpdn627G190
 -----END CERTIFICATE-----)cert";
 
-// Thread-safe strerror that returns an std::string for whatever is currently
-// reported by errno.
-std::string ErrnoToString() {
-  char buf[128] = {};
-  return strerror_r(errno, buf, sizeof(buf));
-}
-
 // Returns the path for a file containing the CA certificate used to
 // authenticate the Intel PCS HTTPS server identity.
 StatusOr<std::string> GetCertFilePath() {
@@ -137,9 +130,7 @@ StatusOr<std::string> GetCertFilePath() {
   absl::call_once(once_flag, [] {
     int fd = mkstemp(cert_filename);
     if (fd == -1) {
-      status = new Status(
-          static_cast<error::PosixError>(errno),
-          absl::StrCat("Error creating temp file: ", ErrnoToString()));
+      status = new Status(LastPosixError("Error creating temp file"));
       return;
     }
 
@@ -148,9 +139,8 @@ StatusOr<std::string> GetCertFilePath() {
     int write_result = write(fd, kCaCert, sizeof(kCaCert) - 1);
     close(fd);
     if (write_result == -1) {
-      status = new Status(static_cast<error::PosixError>(errno),
-                          absl::StrCat("Error writing cert temp file to ",
-                                       cert_filename, ": ", ErrnoToString()));
+      status = new Status(LastPosixError(
+          absl::StrCat("Error writing cert temp file to ", cert_filename)));
     }
   });
 
@@ -164,7 +154,7 @@ StatusOr<std::string> GetCertFilePath() {
 Status WritePemCert(const Certificate &cert_proto, std::ofstream &output) {
   if (cert_proto.format() == Certificate::X509_PEM) {
     output << cert_proto.data();
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   std::unique_ptr<X509Certificate> cert;
@@ -174,7 +164,7 @@ Status WritePemCert(const Certificate &cert_proto, std::ofstream &output) {
   ASYLO_ASSIGN_OR_RETURN(pem_cert_proto,
                          cert->ToCertificateProto(Certificate::X509_PEM));
   output << pem_cert_proto.data();
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status WritePemOutput(const GetPckCertificateResult &cert_result,
@@ -185,7 +175,7 @@ Status WritePemOutput(const GetPckCertificateResult &cert_result,
     ASYLO_RETURN_IF_ERROR(WritePemCert(cert, output));
   }
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status WriteTextProtoOutput(asylo::sgx::GetPckCertificateResult cert_result,
@@ -198,14 +188,13 @@ Status WriteTextProtoOutput(asylo::sgx::GetPckCertificateResult cert_result,
 
   int output_fd = creat(filename.c_str(), /*mode=*/0664);
   if (output_fd == -1) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Unable to open ", filename, ": ", ErrnoToString()));
+    return LastPosixError(absl::StrCat("Unable to open ", filename));
   }
 
   google::protobuf::io::FileOutputStream output(output_fd);
   google::protobuf::TextFormat::Print(chain, &output);
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 }  // namespace

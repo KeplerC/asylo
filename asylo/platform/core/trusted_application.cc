@@ -47,7 +47,6 @@
 #include "asylo/platform/primitives/util/message.h"
 #include "asylo/platform/primitives/util/status_conversions.h"
 #include "asylo/platform/primitives/util/status_serializer.h"
-#include "asylo/util/posix_error_space.h"
 #include "asylo/util/status.h"
 #include "asylo/util/status_macros.h"
 
@@ -165,7 +164,7 @@ Status VerifyOutputArguments(char **output, size_t *output_len) {
     LogError(status);
     return status;
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Application instance returned by BuildTrustedApplication.
@@ -196,7 +195,7 @@ Status InitializeEnvironmentVariables(
     int overwrite = 0;
     setenv(variable.name().c_str(), variable.value().c_str(), overwrite);
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status TrustedApplication::InitializeInternal(const EnclaveConfig &config) {

@@ -110,7 +110,7 @@ class ForkSecurityTest : public ::testing::Test {
     if (!manager_result.ok()) {
       LOG(FATAL) << manager_result.status();
     }
-    manager_ = manager_result.ValueOrDie();
+    manager_ = manager_result.value();
   }
 
   void TearDown() override {
@@ -164,7 +164,7 @@ class ForkSecurityTest : public ::testing::Test {
     ASYLO_RETURN_IF_ERROR(
         primitive_client_->EnterAndTakeSnapshot(&snapshot_layout_));
     snapshot_deleter_.Reset(snapshot_layout_);
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   // Flip a random bit in the snapshot memory. |entry| stores the layout

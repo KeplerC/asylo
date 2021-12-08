@@ -110,7 +110,7 @@ Status SetAttributeBit(AttributeBit bit, Attributes *attributes) {
   } else {
     attributes->set_xfrm(attributes->xfrm() | mask);
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status ClearAttributeBit(AttributeBit bit, Attributes *attributes) {
@@ -124,7 +124,7 @@ Status ClearAttributeBit(AttributeBit bit, Attributes *attributes) {
   } else {
     attributes->set_xfrm(attributes->xfrm() & ~mask);
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 StatusOr<bool> IsAttributeBitSet(AttributeBit bit,
@@ -146,7 +146,7 @@ std::vector<absl::string_view> GetPrintableAttributeList(
   std::vector<absl::string_view> printable_list;
   for (AttributeBit bit : kAllAttributeBits) {
     StatusOr<bool> set_status = IsAttributeBitSet(bit, attributes);
-    if (set_status.ok() && set_status.ValueOrDie()) {
+    if (set_status.ok() && set_status.value()) {
       printable_list.push_back(GetAttributeName(bit));
     }
   }

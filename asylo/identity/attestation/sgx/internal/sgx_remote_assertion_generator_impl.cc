@@ -48,8 +48,8 @@ Status ExtractSgxIdentity(const EnclaveAuthContext &auth_context,
   }
 
   ASYLO_ASSIGN_OR_RETURN(*sgx_identity,
-                         ParseSgxIdentity(*identity_result.ValueOrDie()));
-  return Status::OkStatus();
+                         ParseSgxIdentity(*identity_result.value()));
+  return absl::OkStatus();
 }
 
 }  // namespace
@@ -77,7 +77,7 @@ SgxRemoteAssertionGeneratorImpl::SgxRemoteAssertionGeneratorImpl(
         ::grpc::StatusCode::INTERNAL,
         "Failed to retrieve enclave authentication information");
   }
-  EnclaveAuthContext auth_context = auth_context_result.ValueOrDie();
+  EnclaveAuthContext auth_context = auth_context_result.value();
 
   SgxIdentity sgx_identity;
   Status status = ExtractSgxIdentity(auth_context, &sgx_identity);

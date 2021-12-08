@@ -26,7 +26,7 @@
 #include "absl/strings/str_cat.h"
 #include "asylo/test/misc/signal_test.pb.h"
 #include "asylo/test/util/enclave_test_application.h"
-#include "asylo/util/posix_error_space.h"
+#include "asylo/util/posix_errors.h"
 #include "asylo/util/status.h"
 
 namespace asylo {
@@ -110,8 +110,7 @@ class ActiveEnclaveSignalTest : public TrustedApplication {
     sigaddset(&set, SIGUSR1);
     if (test_type == SignalTestInput::SIGMASK) {
       if (sigprocmask(SIG_BLOCK, &set, &oldset) != 0) {
-        return Status(static_cast<error::PosixError>(errno),
-                      "Failed to block signal");
+        return LastPosixError("Failed to block signal");
       }
     }
     struct sigaction act = {};
@@ -194,9 +193,8 @@ class ActiveEnclaveSignalTest : public TrustedApplication {
     // For signal tests other then SIGMASK, the signal should have been handled
     // by now.
     if (test_type != SignalTestInput::SIGMASK) {
-      return all_signals_handled
-                 ? Status::OkStatus()
-                 : Status(absl::StatusCode::kInternal, "Signal not received");
+      return all_signals_handled ? absl::OkStatus()
+                                 : absl::InternalError("Signal not received");
     }
     // For signal mask test, signal should not have been handled since it's
     // blocked.
@@ -205,13 +203,12 @@ class ActiveEnclaveSignalTest : public TrustedApplication {
                     "Signal received when it's blocked");
     }
     if (sigprocmask(SIG_UNBLOCK, &set, &oldset) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    "Failed to unblock signal");
+      return LastPosixError("Failed to unblock signal");
     }
     // The queued signal should have been handled by now.
-    return signal_handled ? Status::OkStatus()
-                          : Status(absl::StatusCode::kInternal,
-                                   "Signal not received after unblocked");
+    return signal_handled
+               ? absl::OkStatus()
+               : absl::InternalError("Signal not received after unblocked");
   }
 
   // Keeps unblocking the signal to test whether the signal mask in the other
@@ -222,12 +219,11 @@ class ActiveEnclaveSignalTest : public TrustedApplication {
     sigaddset(&set, SIGUSR1);
     for (int i = 0; i < kTimeout; ++i) {
       if (sigprocmask(SIG_UNBLOCK, &set, &oldset) != 0) {
-        return Status(static_cast<error::PosixError>(errno),
-                      "Failed to unblock signal");
+        return LastPosixError("Failed to unblock signal");
       }
       sleep(1);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 };
 

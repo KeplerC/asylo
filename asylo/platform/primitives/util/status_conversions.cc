@@ -18,30 +18,20 @@
 
 #include "asylo/platform/primitives/util/status_conversions.h"
 
-#include "absl/strings/str_cat.h"
+#include "absl/status/status.h"
 #include "asylo/platform/primitives/primitive_status.h"
 
 namespace asylo {
 namespace primitives {
 
 PrimitiveStatus MakePrimitiveStatus(const Status& status) {
-  if (status.error_space() != error::GoogleErrorSpace::GetInstance()) {
-    std::string error_message = absl::StrCat(
-        "Could not convert error space '", status.error_space()->SpaceName(),
-        "' to an asylo PrimitiveStatus: Unexpected error space. Status dump: ",
-        status.ToString());
-
-    return PrimitiveStatus(primitives::AbslStatusCode::kOutOfRange,
-                           error_message);
-  }
-
-  return PrimitiveStatus{status.error_code(), status.error_message().data(),
-                         status.error_message().size()};
+  return PrimitiveStatus{static_cast<int>(status.code()),
+                         status.message().data(), status.message().size()};
 }
 
-Status MakeStatus(const PrimitiveStatus& primitiveStatus) {
-  return Status{error::GoogleErrorSpace::GetInstance(),
-                primitiveStatus.error_code(), primitiveStatus.error_message()};
+Status MakeStatus(const PrimitiveStatus& primitive_status) {
+  return Status{static_cast<absl::StatusCode>(primitive_status.error_code()),
+                primitive_status.error_message()};
 }
 
 }  // namespace primitives

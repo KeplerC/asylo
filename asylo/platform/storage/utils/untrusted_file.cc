@@ -21,7 +21,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "asylo/util/posix_error_space.h"
+#include "absl/status/status.h"
+#include "asylo/util/posix_errors.h"
 
 namespace asylo {
 
@@ -38,8 +39,7 @@ UntrustedFile::~UntrustedFile() {
 Status UntrustedFile::Read(void *buffer, off_t offset, size_t size) {
   off_t result = lseek(fd_, offset, SEEK_SET);
   if (result == -1) {
-    return Status{static_cast<error::PosixError>(errno),
-                  "lseek() failed in UntrustedFile::Read()"};
+    return LastPosixError("lseek() failed in UntrustedFile::Read()");
   }
 
   size_t count = 0;
@@ -51,50 +51,44 @@ Status UntrustedFile::Read(void *buffer, off_t offset, size_t size) {
     }
 
     if (result < 0) {
-      return Status{static_cast<error::PosixError>(errno),
-                    "read() failed in UntrustedFile::Read()"};
+      return LastPosixError("read() failed in UntrustedFile::Read()");
     }
 
     count += result;
   }
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 StatusOr<size_t> UntrustedFile::Size() const {
   off_t result = lseek(fd_, 0, SEEK_END);
   if (result == -1) {
-    return Status{static_cast<error::PosixError>(errno),
-                  "lseek() failed in UntrustedFile::Size()"};
+    return LastPosixError("lseek() failed in UntrustedFile::Size()");
   }
   return result;
 }
 
 Status UntrustedFile::Sync() {
   if (fsync(fd_) != 0) {
-    return Status{static_cast<error::PosixError>(errno),
-                  "fsync() failed in UntrustedFile::Sync()"};
+    return LastPosixError("fsync() failed in UntrustedFile::Sync()");
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status UntrustedFile::Write(const void *buffer, off_t offset, size_t size) {
   off_t result = lseek(fd_, offset, SEEK_SET);
   if (result == -1) {
-    return Status{static_cast<error::PosixError>(errno),
-                  "lseek() failed in UntrustedFile::Write()"};
+    return LastPosixError("lseek() failed in UntrustedFile::Write()");
   }
 
   if (result < offset) {
     if (ftruncate(fd_, offset) != 0) {
-      return Status{static_cast<error::PosixError>(errno),
-                    "ftruncate() failed in UntrustedFile::Write()"};
+      return LastPosixError("ftruncate() failed in UntrustedFile::Write()");
     }
     off_t result = lseek(fd_, offset, SEEK_SET);
     if (result == -1) {
-      return Status{
-          static_cast<error::PosixError>(errno),
-          "lseek() failed after extending file in UntrustedFile::Write()"};
+      return LastPosixError(
+          "lseek() failed after extending file in UntrustedFile::Write()");
     }
   }
 
@@ -109,22 +103,20 @@ Status UntrustedFile::Write(const void *buffer, off_t offset, size_t size) {
     }
 
     if (result < 0) {
-      return Status{static_cast<error::PosixError>(errno),
-                    "write() failed in UntrustedFile::Write()"};
+      return LastPosixError("write() failed in UntrustedFile::Write()");
     }
     count += result;
   }
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status UntrustedFile::Truncate(size_t size) {
   if (ftruncate(fd_, size) != 0) {
-    return Status{static_cast<error::PosixError>(errno),
-                  "ftruncate() failed in UntrustedFile::Truncate()"};
+    return LastPosixError("ftruncate() failed in UntrustedFile::Truncate()");
   }
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 }  // namespace asylo

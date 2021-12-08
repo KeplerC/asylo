@@ -60,7 +60,7 @@ namespace internal {
 
 // Helper functions.
 StatusOr<bssl::UniquePtr<EC_KEY>> CreatePublicKeyFromPrivateKey(
-    const EC_KEY *private_key, int nid);
+    EC_KEY *private_key, int nid);
 Status CheckKeyProtoValues(const AsymmetricSigningKeyProto &key_proto,
                            AsymmetricSigningKeyProto::KeyType expected_type,
                            SignatureScheme signature_scheme);
@@ -92,7 +92,22 @@ Status BsslSignX509(X509 *x509, EC_KEY *private_key) {
   if (X509_sign(x509, evp_pkey.get(), hasher.GetBsslHashFunction()) == 0) {
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
+}
+
+template <class Hash>
+Status BsslSignX509Req(X509_REQ *x509_req, EC_KEY *private_key) {
+  bssl::UniquePtr<EVP_PKEY> evp_pkey(EVP_PKEY_new());
+  if (EVP_PKEY_set1_EC_KEY(evp_pkey.get(), private_key) != 1) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
+
+  Hash hasher;
+  if (X509_REQ_sign(x509_req, evp_pkey.get(), hasher.GetBsslHashFunction()) ==
+      0) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
+  return absl::OkStatus();
 }
 
 // Boring SSL Helper functions to create keys.
@@ -108,13 +123,16 @@ StatusOr<bssl::UniquePtr<EC_KEY>> CreatePrivateEcKeyFromDer(
     int nid, ByteContainerView serialized_key);
 StatusOr<bssl::UniquePtr<EC_KEY>> CreatePrivateEcKeyFromPem(
     ByteContainerView serialized_key);
+StatusOr<bssl::UniquePtr<EC_KEY>> CreatePrivateEcKeyFromScalar(
+    int nid, const BIGNUM *scalar);
 
 // Boring SSL Helper functions to serialize keys.
-StatusOr<std::string> SerializePublicKeyToDer(const EC_KEY *public_key);
-StatusOr<std::string> SerializePublicKeyToPem(EC_KEY *public_key);
-StatusOr<CleansingVector<uint8_t>> SerializePrivateKeyToDer(
+StatusOr<std::string> BsslSerializePublicKeyToDer(const EC_KEY *public_key);
+StatusOr<std::string> BsslSerializePublicKeyToPem(EC_KEY *public_key);
+StatusOr<CleansingVector<uint8_t>> BsslSerializePrivateKeyToDer(
     const EC_KEY *private_key);
-StatusOr<CleansingVector<char>> SerializePrivateKeyToPem(EC_KEY *private_key);
+StatusOr<CleansingVector<char>> BsslSerializePrivateKeyToPem(
+    EC_KEY *private_key);
 
 // Boring SSL Helper functions for signing and verifying.
 Status EcdsaSign(std::vector<uint8_t> *signature, ByteContainerView digest,
@@ -195,11 +213,11 @@ class EcdsaVerifyingKey : public VerifyingKey {
   }
 
   StatusOr<std::string> SerializeToDer() const override {
-    return SerializePublicKeyToDer(public_key_.get());
+    return BsslSerializePublicKeyToDer(public_key_.get());
   }
 
   StatusOr<std::string> SerializeToPem() const override {
-    return SerializePublicKeyToPem(public_key_.get());
+    return BsslSerializePublicKeyToPem(public_key_.get());
   }
 
   Status Verify(ByteContainerView message,
@@ -265,6 +283,11 @@ class EcdsaSigningKey : public SigningKey {
       EcdsaSigningKey<kSignatureScheme, kNid, kCoordinateSize, Hash>>>
   CreateFromProto(const AsymmetricSigningKeyProto &key_proto);
 
+  // Creates an ECDSA signing key from the given |scalar|.
+  static StatusOr<std::unique_ptr<
+      EcdsaSigningKey<kSignatureScheme, kNid, kCoordinateSize, Hash>>>
+  CreateFromScalar(ByteContainerView scalar);
+
   // Creates an ECDSA signing key from the given |private_key|.
   static StatusOr<std::unique_ptr<
       EcdsaSigningKey<kSignatureScheme, kNid, kCoordinateSize, Hash>>>
@@ -277,11 +300,11 @@ class EcdsaSigningKey : public SigningKey {
   }
 
   StatusOr<CleansingVector<uint8_t>> SerializeToDer() const override {
-    return SerializePrivateKeyToDer(private_key_.get());
+    return BsslSerializePrivateKeyToDer(private_key_.get());
   }
 
   StatusOr<CleansingVector<char>> SerializeToPem() const override {
-    return SerializePrivateKeyToPem(private_key_.get());
+    return BsslSerializePrivateKeyToPem(private_key_.get());
   }
 
   StatusOr<std::unique_ptr<VerifyingKey>> GetVerifyingKey() const override {
@@ -307,11 +330,21 @@ class EcdsaSigningKey : public SigningKey {
     ASYLO_RETURN_IF_ERROR(EcdsaSignDigestAndSetRS(GetSignatureScheme(), digest,
                                                   private_key_.get(),
                                                   kCoordinateSize, signature));
-    return Status::OkStatus();
+    return absl::OkStatus();
+  }
+
+  // From X509Signer.
+
+  StatusOr<std::string> SerializePublicKeyToDer() const override {
+    return BsslSerializePublicKeyToDer(public_key_.get());
   }
 
   Status SignX509(X509 *x509) const override {
     return BsslSignX509<Hash>(x509, private_key_.get());
+  }
+
+  Status SignX509Req(X509_REQ *x509_req) const override {
+    return BsslSignX509Req<Hash>(x509_req, private_key_.get());
   }
 
   StatusOr<EccCurvePoint<kCoordinateSize>> GetPublicKeyPoint() const;
@@ -448,7 +481,8 @@ Status EcdsaVerifyingKey<kSignatureScheme, kNid, kCoordinateSize, Hash>::Verify(
                            public_key_.get());
 }
 
-// EcdsaSigningKey methods CreateFromProto, Create, and methods from SigningKey.
+// EcdsaSigningKey methods CreateFromProto, Create, CreateFromScalar, and
+// methods from SigningKey.
 
 template <SignatureScheme kSignatureScheme, int kNid, int32_t kCoordinateSize,
           class Hash>
@@ -476,6 +510,28 @@ template <SignatureScheme kSignatureScheme, int kNid, int32_t kCoordinateSize,
           class Hash>
 StatusOr<std::unique_ptr<
     EcdsaSigningKey<kSignatureScheme, kNid, kCoordinateSize, Hash>>>
+EcdsaSigningKey<kSignatureScheme, kNid, kCoordinateSize,
+                Hash>::CreateFromScalar(ByteContainerView scalar) {
+  if (scalar.size() != kCoordinateSize) {
+    return Status(absl::StatusCode::kInvalidArgument,
+                  absl::StrFormat("Size of scalar (%d) must be %d",
+                                  scalar.size(), kCoordinateSize));
+  }
+
+  bssl::UniquePtr<BIGNUM> bignum_scalar;
+  ASYLO_ASSIGN_OR_RETURN(bignum_scalar, BignumFromBigEndianBytes(scalar));
+
+  bssl::UniquePtr<EC_KEY> key;
+  ASYLO_ASSIGN_OR_RETURN(
+      key, CreatePrivateEcKeyFromScalar(kNid, bignum_scalar.get()));
+
+  return Create(std::move(key));
+}
+
+template <SignatureScheme kSignatureScheme, int kNid, int32_t kCoordinateSize,
+          class Hash>
+StatusOr<std::unique_ptr<
+    EcdsaSigningKey<kSignatureScheme, kNid, kCoordinateSize, Hash>>>
 EcdsaSigningKey<kSignatureScheme, kNid, kCoordinateSize, Hash>::Create(
     bssl::UniquePtr<EC_KEY> private_key) {
   if (GetEcCurveNid(private_key.get()) != kNid) {
@@ -491,7 +547,7 @@ EcdsaSigningKey<kSignatureScheme, kNid, kCoordinateSize, Hash>::Create(
 
   return absl::WrapUnique<EcdsaSigningKey>(
       new EcdsaSigningKey<kSignatureScheme, kNid, kCoordinateSize, Hash>(
-          std::move(private_key), std::move(public_key_result).ValueOrDie()));
+          std::move(private_key), std::move(public_key_result).value()));
 }
 
 template <SignatureScheme kSignatureScheme, int kNid, int32_t kCoordinateSize,

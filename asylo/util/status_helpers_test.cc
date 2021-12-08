@@ -22,11 +22,18 @@
 #include <vector>
 
 #include <google/protobuf/stubs/status.h>
+#include "google/protobuf/struct.pb.h"
+#include "google/protobuf/timestamp.pb.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "absl/status/status.h"
+#include "absl/strings/cord.h"
 #include "absl/strings/string_view.h"
-#include "asylo/platform/primitives/sgx/sgx_error_space.h"
+#include "absl/types/optional.h"
+#include "asylo/enclave.pb.h"
+#include "asylo/platform/primitives/sgx/sgx_errors.h"
+#include "asylo/test/util/proto_matchers.h"
+#include "asylo/test/util/status_matchers.h"
 #include "asylo/util/error_codes.h"
 #include "asylo/util/status.h"
 #include "include/grpcpp/support/status.h"
@@ -37,6 +44,8 @@ namespace {
 
 using ::testing::Eq;
 using ::testing::HasSubstr;
+using ::testing::MatchesRegex;
+using ::testing::Optional;
 using ::testing::Test;
 using ::testing::Types;
 
@@ -64,16 +73,16 @@ struct StatusInfo;
 template <>
 struct StatusInfo<Status> {
   static int GetCanonicalCode(const Status &status) {
-    return status.CanonicalCode();
+    return static_cast<int>(status.code());
   }
 
   static std::string GetErrorMessage(const Status &status) {
-    return std::string(status.error_message());
+    return std::string(status.message());
   }
 
   static std::vector<Status> TestData() {
     return {Status(kCanonicalCode, kErrorMessage),
-            Status(SGX_ERROR_OUT_OF_MEMORY, kErrorMessage)};
+            SgxError(SGX_ERROR_OUT_OF_MEMORY, kErrorMessage)};
   }
 };
 
@@ -176,6 +185,102 @@ TYPED_TEST(ConvertStatusTest, HasCorrectPropertiesAfterConversion) {
     // space information to the error message.
     EXPECT_THAT(ToInfo::GetErrorMessage(to_status), HasSubstr(kErrorMessage));
   }
+}
+
+TEST(StatusHelpersTest, GetTypeUrlReturnsExpectedUrl) {
+  EXPECT_THAT(GetTypeUrl<EnclaveInput>(),
+              Eq("type.googleapis.com/asylo.EnclaveInput"));
+  EXPECT_THAT(GetTypeUrl<google::protobuf::Timestamp>(),
+              Eq("type.googleapis.com/google.protobuf.Timestamp"));
+}
+
+// Provides traits for absl::Status-like types. Each specialization must have
+// the following members:
+//
+//     // The Status type.
+//     using StatusType = ...;
+//
+//     // The associated StatusOr type.
+//     template <typename T>
+//     using StatusOrType = ...;
+template <typename StatusT>
+struct AbslStatusLikeInfo;
+
+template <>
+struct AbslStatusLikeInfo<Status> {
+  using StatusType = Status;
+
+  template <typename T>
+  using StatusOrType = StatusOr<T>;
+};
+
+template <>
+struct AbslStatusLikeInfo<absl::Status> {
+  using StatusType = absl::Status;
+
+  template <typename T>
+  using StatusOrType = absl::StatusOr<T>;
+};
+
+template <typename StatusT>
+class AbslStatusLikeTest : public Test {};
+using AbslStatusLikeTypes = Types<Status, absl::Status>;
+TYPED_TEST_SUITE(AbslStatusLikeTest, AbslStatusLikeTypes);
+
+TYPED_TEST(AbslStatusLikeTest, GetReturnsNulloptIfNoMatchingPayload) {
+  typename AbslStatusLikeInfo<TypeParam>::StatusType status =
+      absl::DeadlineExceededError("foobar");
+  EXPECT_THAT(GetProtoPayload<google::protobuf::Struct>(status),
+              Eq(absl::nullopt));
+}
+
+TYPED_TEST(AbslStatusLikeTest, GetReturnsNulloptIfPayloadFailsToParse) {
+  typename AbslStatusLikeInfo<TypeParam>::StatusType status =
+      absl::DeadlineExceededError("foobar");
+  status.SetPayload(GetTypeUrl<google::protobuf::Struct>(),
+                    absl::Cord("notaproto"));
+  EXPECT_THAT(GetProtoPayload<google::protobuf::Struct>(status),
+              Eq(absl::nullopt));
+}
+
+TYPED_TEST(AbslStatusLikeTest, GetReturnsPayloadAddedBySet) {
+  google::protobuf::Struct proto;
+  google::protobuf::Value value;
+  value.set_string_value("bar");
+  proto.mutable_fields()->insert({"foo", value});
+
+  typename AbslStatusLikeInfo<TypeParam>::StatusType status =
+      absl::DeadlineExceededError("foobar");
+  SetProtoPayload(proto, status);
+  EXPECT_THAT(GetProtoPayload<google::protobuf::Struct>(status),
+              Optional(EqualsProto(proto)));
+}
+
+TYPED_TEST(AbslStatusLikeTest, WithContextDoesNothingToOkStatus) {
+  typename AbslStatusLikeInfo<TypeParam>::StatusType status = absl::OkStatus();
+  EXPECT_THAT(WithContext(status, "some context"), Eq(absl::OkStatus()));
+}
+
+TYPED_TEST(AbslStatusLikeTest, WithContextAddsContextToNonOkStatus) {
+  typename AbslStatusLikeInfo<TypeParam>::StatusType status =
+      absl::DeadlineExceededError("foobar");
+  EXPECT_THAT(WithContext(status, "some context"),
+              StatusIs(absl::StatusCode::kDeadlineExceeded,
+                       MatchesRegex(".*some context.*foobar.*")));
+}
+
+TYPED_TEST(AbslStatusLikeTest, WithContextDoesNothingToOkStatusOr) {
+  typename AbslStatusLikeInfo<TypeParam>::template StatusOrType<int> status_or(
+      5);
+  EXPECT_THAT(WithContext(status_or, "some context"), IsOkAndHolds(Eq(5)));
+}
+
+TYPED_TEST(AbslStatusLikeTest, WithContextAddsContextToNonOkStatusOr) {
+  typename AbslStatusLikeInfo<TypeParam>::template StatusOrType<int> status_or(
+      absl::DeadlineExceededError("foobar"));
+  EXPECT_THAT(WithContext(status_or, "some context"),
+              StatusIs(absl::StatusCode::kDeadlineExceeded,
+                       MatchesRegex(".*some context.*foobar.*")));
 }
 
 }  // namespace

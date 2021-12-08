@@ -19,10 +19,12 @@
 #include "asylo/platform/primitives/remote/metrics/proc_system_service.h"
 
 #include "absl/memory/memory.h"
+#include "absl/status/status.h"
 #include "asylo/platform/primitives/remote/metrics/proc_system.grpc.pb.h"
 #include "asylo/platform/primitives/remote/metrics/proc_system.pb.h"
 #include "asylo/platform/primitives/remote/metrics/proc_system_parser.h"
 #include "asylo/util/status.h"
+#include "asylo/util/status_helpers.h"
 #include "asylo/util/status_macros.h"
 #include "include/grpc/support/time.h"
 #include "include/grpcpp/support/status.h"
@@ -36,8 +38,7 @@ namespace primitives {
   auto status = BuildProcStatResponse(response);
   if (!status.ok()) {
     LOG(ERROR) << status;
-    return ::grpc::Status(static_cast<::grpc::StatusCode>(status.error_code()),
-                          std::string(status.error_message()));
+    return ConvertStatus<::grpc::Status>(status);
   }
   return ::grpc::Status::OK;
 }
@@ -105,7 +106,7 @@ ProcSystemServiceImpl::CreateProcSystemParser() const {
   response_proc_stat->set_env_start(proc_stat.env_start);
   response_proc_stat->set_env_end(proc_stat.env_end);
   response_proc_stat->set_exit_code(proc_stat.exit_code);
-  return ::asylo::Status::OkStatus();
+  return ::absl::OkStatus();
 }
 
 }  // namespace primitives

@@ -65,7 +65,7 @@ OutT CheckedPointerCast(InT in) {
 Status PceErrorToStatus(sgx_pce_error_t pce_error) {
   switch (pce_error) {
     case SGX_PCE_SUCCESS:
-      return Status::OkStatus();
+      return absl::OkStatus();
     case SGX_PCE_UNEXPECTED:
       return absl::InternalError("Unexpected error");
     case SGX_PCE_OUT_OF_EPC:
@@ -182,12 +182,12 @@ Status DcapIntelArchitecturalEnclaveInterface::SetPckCertificateChain(
     // Wrap the cert parsing error so that we always return INVALID_ARGUMENT if
     // the input cert chain cannot be parsed. The cert chain parsing code will
     // return other errors, which are potentially misleading.
-    return absl::InvalidArgumentError(parsed_chain.status().error_message());
+    return absl::InvalidArgumentError(parsed_chain.status().message());
   }
 
   SgxExtensions extensions;
   ASYLO_ASSIGN_OR_RETURN(extensions, ExtractSgxExtensionsFromPckCert(
-                                         *parsed_chain.ValueOrDie().front()));
+                                         *parsed_chain.value().front()));
 
   sgx_ql_config_t config;
   config.version = SGX_QL_CONFIG_VERSION_1;
@@ -201,7 +201,7 @@ Status DcapIntelArchitecturalEnclaveInterface::SetPckCertificateChain(
   config.cert_pce_isv_svn = extensions.tcb.pce_svn().value();
 
   std::string cert_data;
-  for (const auto &parsed_cert : parsed_chain.ValueOrDie()) {
+  for (const auto &parsed_cert : parsed_chain.value()) {
     Certificate proto_cert;
     ASYLO_ASSIGN_OR_RETURN(
         proto_cert, parsed_cert->ToCertificateProto(Certificate::X509_PEM));

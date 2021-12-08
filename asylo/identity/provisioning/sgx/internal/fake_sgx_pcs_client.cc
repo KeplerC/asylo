@@ -75,6 +75,7 @@
 #include "asylo/util/cleansing_types.h"
 #include "asylo/util/proto_enum_util.h"
 #include "asylo/util/status.h"
+#include "asylo/util/status_helpers.h"
 #include "asylo/util/status_macros.h"
 #include "asylo/util/time_conversions.h"
 
@@ -136,7 +137,7 @@ Status FmspcIsValidAndMatchesLayout(const Fmspc &fmspc) {
         absl::StrCat("Invalid FMSPC: bad SgxCaType: ",
                      ProtoEnumValueName(static_cast<SgxCaType>(layout->ca))));
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Returns an error if |ppid| is not valid according to ValidatePpid() or does
@@ -174,7 +175,7 @@ Status IsValidFmspcTcbInfoPair(const Fmspc &fmspc, const TcbInfo &tcb_info) {
         absl::StrFormat("TCB info is for wrong PCE ID: expected %d, found %d",
                         layout->pce_id, tcb_info.impl().pce_id().value()));
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Fills |buffer| with random bytes.
@@ -212,7 +213,7 @@ CpuSvn CpuSvnFromTcb(const Tcb &tcb) {
 std::string GoogleTimestampToIso8601String(
     const google::protobuf::Timestamp &timestamp) {
   return absl::FormatTime("%Y-%m-%dT%H:%M:%SZ",
-                          ConvertTime<absl::Time>(timestamp).ValueOrDie(),
+                          ConvertTime<absl::Time>(timestamp).value(),
                           absl::UTCTimeZone());
 }
 
@@ -310,16 +311,16 @@ FakeSgxPcsClient::FakeSgxPcsClient()
     : FakeSgxPcsClient(
           std::move(std::move(EcdsaP256Sha256VerifyingKey::CreateFromPem(
                                   kFakePckPublicPem))
-                        .ValueOrDie()
+                        .value()
                         ->SerializeToDer())
-              .ValueOrDie()) {}
+              .value()) {}
 
 FakeSgxPcsClient::FakeSgxPcsClient(absl::string_view pck_der)
     : tcb_info_issuer_chain_(CreateCertificateChainFromPemCerts(
           {kFakeSgxTcbSigner.certificate_pem, kFakeSgxRootCa.certificate_pem})),
       tcb_info_signing_key_(std::move(EcdsaP256Sha256SigningKey::CreateFromPem(
                                           kFakeSgxTcbSigner.signing_key_pem))
-                                .ValueOrDie()),
+                                .value()),
       pck_public_key_der_(reinterpret_cast<const char *>(pck_der.data()),
                           pck_der.size()),
       tcb_infos_(FmspcToTcbInfoMap()),
@@ -344,7 +345,7 @@ Status FakeSgxPcsClient::UpdateFmspc(const Fmspc &fmspc, TcbInfo tcb_info) {
         "Unknown FMSPC: 0x", absl::BytesToHexString(fmspc.value())));
   }
   it->second = std::move(tcb_info);
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 StatusOr<GetPckCertificateResult> FakeSgxPcsClient::GetPckCertificate(
@@ -424,10 +425,10 @@ StatusOr<GetTcbInfoResult> FakeSgxPcsClient::GetTcbInfo(const Fmspc &fmspc) {
   auto *impl = tcb_info.mutable_impl();
   absl::Time issue_date = absl::Now();
   *impl->mutable_issue_date() =
-      ConvertTime<google::protobuf::Timestamp>(issue_date).ValueOrDie();
+      ConvertTime<google::protobuf::Timestamp>(issue_date).value();
   absl::Time next_update = issue_date + absl::Hours(24 * 30);
   *impl->mutable_next_update() =
-      ConvertTime<google::protobuf::Timestamp>(next_update).ValueOrDie();
+      ConvertTime<google::protobuf::Timestamp>(next_update).value();
 
   std::string tcb_info_json;
   ASYLO_ASSIGN_OR_RETURN(tcb_info_json, TcbInfoToJson(tcb_info));
@@ -508,14 +509,14 @@ FakeSgxPcsClient::CreateFakePckCertificateInfo(
 StatusOr<Certificate> FakeSgxPcsClient::CreateFakePckCertificate(
     const CaInfo &ca_info, const SgxExtensions &extension_data) const {
   static constexpr int kSerialNumberByteSize = 20;
-  static const X509Name *kSubject = new X509Name(
-      {{ObjectId::CreateFromShortName("CN").ValueOrDie(),
-        "Asylo Fake SGX PCK Certificate For Testing Only"},
-       {ObjectId::CreateFromShortName("O").ValueOrDie(),
-        "Asylo Fake SGX PKI For Testing Only"},
-       {ObjectId::CreateFromShortName("L").ValueOrDie(), "Kirkland"},
-       {ObjectId::CreateFromShortName("ST").ValueOrDie(), "WA"},
-       {ObjectId::CreateFromShortName("C").ValueOrDie(), "US"}});
+  static const X509Name *kSubject =
+      new X509Name({{ObjectId::CreateFromShortName("CN").value(),
+                     "Asylo Fake SGX PCK Certificate For Testing Only"},
+                    {ObjectId::CreateFromShortName("O").value(),
+                     "Asylo Fake SGX PKI For Testing Only"},
+                    {ObjectId::CreateFromShortName("L").value(), "Kirkland"},
+                    {ObjectId::CreateFromShortName("ST").value(), "WA"},
+                    {ObjectId::CreateFromShortName("C").value(), "US"}});
 
   X509CertificateBuilder builder;
 
@@ -562,10 +563,10 @@ FakeSgxPcsClient::CaInfo::CaInfo(
     : issuer_chain(CreateCertificateChainFromPemCerts(issuer_chain_pem)),
       certificate(
           std::move(X509Certificate::Create(issuer_chain.certificates(0)))
-              .ValueOrDie()),
+              .value()),
       signing_key(
           std::move(EcdsaP256Sha256SigningKey::CreateFromPem(signing_key_pem))
-              .ValueOrDie()) {}
+              .value()) {}
 
 }  // namespace sgx
 }  // namespace asylo

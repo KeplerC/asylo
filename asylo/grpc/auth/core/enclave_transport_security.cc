@@ -299,9 +299,8 @@ tsi_result enclave_handshaker_next(
       // If the handshake has completed, extract the handshake results.
       StatusOr<std::string> unused_bytes_result = handshaker->GetUnusedBytes();
       if (!unused_bytes_result.ok()) {
-        gpr_log(
-            GPR_ERROR, "Failed to retrieve unused bytes: %s",
-            std::string(unused_bytes_result.status().error_message()).c_str());
+        gpr_log(GPR_ERROR, "Failed to retrieve unused bytes: %s",
+                std::string(unused_bytes_result.status().message()).c_str());
         return TSI_INTERNAL_ERROR;
       }
 
@@ -309,8 +308,7 @@ tsi_result enclave_handshaker_next(
           handshaker->GetRecordProtocol();
       if (!record_protocol_result.ok()) {
         gpr_log(GPR_ERROR, "Failed to retrieve record protocol: %s",
-                std::string(record_protocol_result.status().error_message())
-                    .c_str());
+                std::string(record_protocol_result.status().message()).c_str());
         return TSI_INTERNAL_ERROR;
       }
 
@@ -318,21 +316,20 @@ tsi_result enclave_handshaker_next(
           handshaker->GetRecordProtocolKey();
       if (!key_result.ok()) {
         gpr_log(GPR_ERROR, "Failed to retrieve record protocol key: %s",
-                std::string(key_result.status().error_message()).c_str());
+                std::string(key_result.status().message()).c_str());
         return TSI_INTERNAL_ERROR;
       }
 
       StatusOr<std::unique_ptr<EnclaveIdentities>> identities_result =
           handshaker->GetPeerIdentities();
       if (!identities_result.ok()) {
-        gpr_log(
-            GPR_ERROR, "Failed to retrieve peer identities: %s",
-            std::string(identities_result.status().error_message()).c_str());
+        gpr_log(GPR_ERROR, "Failed to retrieve peer identities: %s",
+                std::string(identities_result.status().message()).c_str());
         return TSI_INTERNAL_ERROR;
       }
 
       std::unique_ptr<EnclaveIdentities> identities =
-          std::move(identities_result).ValueOrDie();
+          std::move(identities_result).value();
 
       tsi_result acl_eval_result = tsi_handshaker->evaluate_acl(
           {identities->identities().begin(), identities->identities().end()});
@@ -343,9 +340,9 @@ tsi_result enclave_handshaker_next(
       // Create the handshaker result object.
       tsi_result result = enclave_handshaker_result_create(
           absl::make_unique<TsiEnclaveHandshakerResult>(
-              tsi_handshaker->is_client, record_protocol_result.ValueOrDie(),
-              key_result.ValueOrDie(), std::move(identities),
-              unused_bytes_result.ValueOrDie()),
+              tsi_handshaker->is_client, record_protocol_result.value(),
+              key_result.value(), std::move(identities),
+              unused_bytes_result.value()),
           handshaker_result);
       if (result == TSI_OK) {
         self->handshaker_result_created = true;
@@ -393,7 +390,7 @@ tsi_result tsi_enclave_handshaker::evaluate_acl(
             acl_result.status().ToString().c_str());
     return TSI_INTERNAL_ERROR;
   }
-  if (!acl_result.ValueOrDie()) {
+  if (!acl_result.value()) {
     gpr_log(GPR_ERROR, "Identities did not match ACL: %s", explanation.c_str());
     return TSI_PERMISSION_DENIED;
   }

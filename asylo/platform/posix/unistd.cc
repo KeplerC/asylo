@@ -29,6 +29,7 @@
 #include "asylo/platform/posix/io/io_manager.h"
 #include "asylo/platform/primitives/trusted_primitives.h"
 #include "asylo/platform/primitives/trusted_runtime.h"
+#include "asylo/util/posix_errors.h"
 #include "asylo/util/statusor.h"
 
 using asylo::io::IOManager;
@@ -47,7 +48,7 @@ pid_t ForkEnclave() {
     return -1;
   }
 
-  const asylo::EnclaveConfig *config = config_result.ValueOrDie();
+  const asylo::EnclaveConfig *config = config_result.value();
   if (!config->has_enable_fork()) {
     errno = EFAULT;
     return -1;
@@ -99,7 +100,7 @@ int gethostname(char *name, size_t len) {
     return -1;
   }
 
-  const asylo::EnclaveConfig *config = config_result.ValueOrDie();
+  const asylo::EnclaveConfig *config = config_result.value();
   if (!config->has_host_name()) {
     errno = EFAULT;
     return -1;
@@ -213,7 +214,7 @@ int chdir(const char *path) {
   asylo::Status status =
       IOManager::GetInstance().SetCurrentWorkingDirectory(path);
   if (!status.ok()) {
-    errno = status.error_code();
+    errno = GetErrno(status);
     return -1;
   }
 

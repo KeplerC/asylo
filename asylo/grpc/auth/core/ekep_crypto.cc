@@ -28,12 +28,13 @@
 #include <cstdint>
 #include <memory>
 
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "asylo/crypto/sha256_hash.h"
 #include "asylo/crypto/util/bssl_util.h"
 #include "asylo/crypto/util/byte_container_view.h"
 #include "asylo/util/logging.h"
-#include "asylo/grpc/auth/core/ekep_error_space.h"
+#include "asylo/grpc/auth/core/ekep_errors.h"
 #include "asylo/util/proto_enum_util.h"
 #include "asylo/util/status.h"
 
@@ -64,7 +65,7 @@ Status Hmac(const HandshakeCipher &ciphersuite, ByteContainerView key,
       mac->resize(kSha256DigestLength);
       break;
     default:
-      return Status(
+      return EkepError(
           Abort::BAD_HANDSHAKE_CIPHER,
           "Ciphersuite not supported: " + ProtoEnumValueName(ciphersuite));
   }
@@ -73,9 +74,9 @@ Status Hmac(const HandshakeCipher &ciphersuite, ByteContainerView key,
   if (!HMAC(digest, key.data(), key.size(), authenticated_text.data(),
             authenticated_text.size(), mac->data(), &mac_size)) {
     LOG(ERROR) << "HMAC failed: " << BsslLastErrorString();
-    return Status(Abort::INTERNAL_ERROR, "Internal error");
+    return EkepError(Abort::INTERNAL_ERROR, "Internal error");
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 }  // namespace
@@ -95,14 +96,14 @@ Status DeriveSecrets(const HandshakeCipher &ciphersuite,
     case CURVE25519_SHA256:
       // Validate the arguments.
       if (peer_dh_public_key.size() != X25519_PUBLIC_VALUE_LEN) {
-        return Status(Abort::PROTOCOL_ERROR,
-                      absl::StrCat("Public parameter has incorrect size: ",
-                                   peer_dh_public_key.size()));
+        return EkepError(Abort::PROTOCOL_ERROR,
+                         absl::StrCat("Public parameter has incorrect size: ",
+                                      peer_dh_public_key.size()));
       }
       if (self_dh_private_key.size() != X25519_PRIVATE_KEY_LEN) {
-        return Status(Abort::INTERNAL_ERROR,
-                      absl::StrCat("Private parameter has incorrect size: ",
-                                   self_dh_private_key.size()));
+        return EkepError(Abort::INTERNAL_ERROR,
+                         absl::StrCat("Private parameter has incorrect size: ",
+                                      self_dh_private_key.size()));
       }
 
       // Compute the shared secret.
@@ -110,14 +111,14 @@ Status DeriveSecrets(const HandshakeCipher &ciphersuite,
       if (!X25519(shared_secret.data(), self_dh_private_key.data(),
                   peer_dh_public_key.data())) {
         LOG(ERROR) << "X25519 failed: " << BsslLastErrorString();
-        return Status(Abort::INTERNAL_ERROR, "Internal error");
+        return EkepError(Abort::INTERNAL_ERROR, "Internal error");
       }
 
       // Initialize a SHA256-digest for HKDF.
       digest = EVP_sha256();
       break;
     default:
-      return Status(
+      return EkepError(
           Abort::BAD_HANDSHAKE_CIPHER,
           "Ciphersuite not supported: " + ProtoEnumValueName(ciphersuite));
   }
@@ -131,7 +132,7 @@ Status DeriveSecrets(const HandshakeCipher &ciphersuite,
             reinterpret_cast<const uint8_t *>(salt.data()), salt.size(),
             transcript_hash.data(), transcript_hash.size())) {
     LOG(ERROR) << "HKDF failed: " << BsslLastErrorString();
-    return Status(Abort::INTERNAL_ERROR, "Internal error");
+    return EkepError(Abort::INTERNAL_ERROR, "Internal error");
   }
 
   // Copy the primary secret.
@@ -142,7 +143,7 @@ Status DeriveSecrets(const HandshakeCipher &ciphersuite,
   std::copy(output_key.cbegin() + kEkepPrimarySecretSize, output_key.cend(),
             std::back_inserter(*authenticator_secret));
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status DeriveRecordProtocolKey(const HandshakeCipher &ciphersuite,
@@ -157,7 +158,7 @@ Status DeriveRecordProtocolKey(const HandshakeCipher &ciphersuite,
       digest = EVP_sha256();
       break;
     default:
-      return Status(
+      return EkepError(
           Abort::BAD_HANDSHAKE_CIPHER,
           "Ciphersuite not supported: " + ProtoEnumValueName(ciphersuite));
   }
@@ -177,9 +178,9 @@ Status DeriveRecordProtocolKey(const HandshakeCipher &ciphersuite,
       RAND_bytes(record_protocol_key->data(), record_protocol_key->size());
       break;
     default:
-      return Status(Abort::BAD_RECORD_PROTOCOL,
-                    "Record protocol not supported " +
-                        ProtoEnumValueName(record_protocol));
+      return EkepError(Abort::BAD_RECORD_PROTOCOL,
+                       "Record protocol not supported " +
+                           ProtoEnumValueName(record_protocol));
   }
 
   std::string salt(kEkepHkdfSaltRecordProtocol);
@@ -188,9 +189,9 @@ Status DeriveRecordProtocolKey(const HandshakeCipher &ciphersuite,
             reinterpret_cast<const uint8_t *>(salt.data()), salt.size(),
             transcript_hash.data(), transcript_hash.size())) {
     LOG(ERROR) << "HKDF failed: " << BsslLastErrorString();
-    return Status(Abort::INTERNAL_ERROR, "Internal error");
+    return EkepError(Abort::INTERNAL_ERROR, "Internal error");
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status ComputeClientHandshakeAuthenticator(

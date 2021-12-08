@@ -32,7 +32,7 @@
 #include "absl/strings/str_cat.h"
 #include "asylo/platform/primitives/sgx/exit_handlers.h"
 #include "asylo/platform/primitives/sgx/generated_bridge_u.h"
-#include "asylo/platform/primitives/sgx/sgx_error_space.h"
+#include "asylo/platform/primitives/sgx/sgx_errors.h"
 #include "asylo/platform/primitives/sgx/sgx_params.h"
 #include "asylo/platform/primitives/sgx/signal_dispatcher.h"
 #include "asylo/platform/primitives/untrusted_primitives.h"
@@ -41,7 +41,6 @@
 #include "asylo/util/elf_reader.h"
 #include "asylo/util/file_mapping.h"
 #include "asylo/util/function_deleter.h"
-#include "asylo/util/posix_error_space.h"
 #include "asylo/util/status.h"
 #include "asylo/util/status_helpers.h"
 #include "asylo/util/status_macros.h"
@@ -80,8 +79,7 @@ static Status TransferSecureSnapshotKey(sgx_enclave_id_t eid, const char *input,
     *output_len = static_cast<size_t>(bridge_output_len);
   }
   if (sgx_status != SGX_SUCCESS) {
-    // Return a Status object in the SGX error space.
-    return Status(sgx_status, "Call to ecall_do_handshake failed");
+    return SgxError(sgx_status, "Call to ecall_do_handshake failed");
   } else if (retval || !output_len || *output_len == 0) {
     // Ecall succeeded but did not return a value. This indicates that the
     // trusted code failed to propagate error information over the enclave
@@ -104,8 +102,7 @@ static Status TakeSnapshot(sgx_enclave_id_t eid, char **output,
     *output_len = static_cast<size_t>(bridge_output_len);
   }
   if (sgx_status != SGX_SUCCESS) {
-    // Return a Status object in the SGX error space.
-    return Status(sgx_status, "Call to ecall_take_snapshot failed");
+    return SgxError(sgx_status, "Call to ecall_take_snapshot failed");
   } else if (retval || !output_len || *output_len == 0) {
     // Ecall succeeded but did not return a value. This indicates that the
     // trusted code failed to propagate error information over the enclave
@@ -113,7 +110,7 @@ static Status TakeSnapshot(sgx_enclave_id_t eid, char **output,
     return absl::InternalError("No output from enclave");
   }
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Enters the enclave and invokes the restoring entry-point. If the ecall fails,
@@ -128,15 +125,14 @@ static Status Restore(sgx_enclave_id_t eid, const char *input, size_t input_len,
     *output_len = static_cast<size_t>(bridge_output_len);
   }
   if (sgx_status != SGX_SUCCESS) {
-    // Return a Status object in the SGX error space.
-    return Status(sgx_status, "Call to ecall_restore failed");
+    return SgxError(sgx_status, "Call to ecall_restore failed");
   } else if (retval || !output_len || *output_len == 0) {
     // Ecall succeeded but did not return a value. This indicates that the
     // trusted code failed to propagate error information over the enclave
     // boundary.
     return absl::InternalError("No output from enclave");
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 }  // namespace
@@ -176,7 +172,7 @@ StatusOr<std::shared_ptr<Client>> SgxBackend::Load(
   }
 
   if (status != SGX_SUCCESS) {
-    return Status(
+    return SgxError(
         status, absl::StrCat("Failed to create an enclave for ", enclave_path));
   }
 
@@ -259,7 +255,7 @@ StatusOr<std::shared_ptr<Client>> SgxEmbeddedBackend::Load(
   client->size_ = sgx_enclave_size(client->id_);
 
   if (status != SGX_SUCCESS) {
-    return Status(status, "Failed to create an enclave");
+    return SgxError(status, "Failed to create an enclave");
   }
 
   client->is_destroyed_ = false;
@@ -272,13 +268,13 @@ Status SgxEnclaveClient::Destroy() {
   ScopedCurrentClient scoped_client(this);
   sgx_status_t status = sgx_destroy_enclave(id_);
   if (status != SGX_SUCCESS) {
-    return Status(status, "Failed to destroy enclave");
+    return SgxError(status, "Failed to destroy enclave");
   }
   is_destroyed_ = true;
   ASYLO_RETURN_IF_ERROR(
       EnclaveSignalDispatcher::GetInstance()->DeregisterAllSignalsForClient(
           this));
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status SgxEnclaveClient::RegisterExitHandlers() {
@@ -325,8 +321,7 @@ Status SgxEnclaveClient::EnclaveCallInternal(uint64_t selector,
   sgx_status_t status =
       ecall_dispatch_trusted_call(id_, &retval, selector, &params);
   if (status != SGX_SUCCESS) {
-    // Return a Status object in the SGX error space.
-    return Status(status, "Call to primitives ecall endpoint failed");
+    return SgxError(status, "Call to primitives ecall endpoint failed");
   }
   if (retval) {
     return absl::InternalError("Enclave call failed inside enclave");
@@ -334,7 +329,7 @@ Status SgxEnclaveClient::EnclaveCallInternal(uint64_t selector,
   if (params.output) {
     output->Deserialize(params.output, static_cast<size_t>(params.output_size));
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 int SgxEnclaveClient::EnterAndHandleSignal(int signum, int sigcode) {

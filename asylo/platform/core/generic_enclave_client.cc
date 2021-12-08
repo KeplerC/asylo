@@ -29,7 +29,6 @@
 #include "asylo/platform/primitives/extent.h"
 #include "asylo/platform/primitives/primitives.h"
 #include "asylo/platform/primitives/util/message.h"
-#include "asylo/util/posix_error_space.h"
 #include "asylo/util/status.h"
 #include "asylo/util/status_helpers.h"
 #include "asylo/util/status_macros.h"
@@ -64,7 +63,7 @@ Status GenericEnclaveClient::Initialize(const char *name, size_t name_len,
   *output_len = output_extent.size();
   output->reset(new char[*output_len]);
   memcpy(output->get(), output_extent.As<char>(), *output_len);
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status GenericEnclaveClient::Run(const char *input, size_t input_len,
@@ -80,7 +79,7 @@ Status GenericEnclaveClient::Run(const char *input, size_t input_len,
   *output_len = output_extent.size();
   output->reset(new char[*output_len]);
   memcpy(output->get(), output_extent.As<char>(), *output_len);
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status GenericEnclaveClient::Finalize(const char *input, size_t input_len,
@@ -96,7 +95,7 @@ Status GenericEnclaveClient::Finalize(const char *input, size_t input_len,
   *output_len = output_extent.size();
   output->reset(new char[*output_len]);
   memcpy(output->get(), output_extent.As<char>(), *output_len);
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status GenericEnclaveClient::EnterAndInitialize(const EnclaveConfig &config) {

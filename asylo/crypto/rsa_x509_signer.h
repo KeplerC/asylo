@@ -21,6 +21,7 @@
 #include <openssl/rsa.h>
 
 #include <memory>
+#include <string>
 
 #include "asylo/crypto/algorithms.pb.h"
 #include "asylo/crypto/util/byte_container_view.h"
@@ -29,27 +30,37 @@
 
 namespace asylo {
 
-// An implementation of the X509Signer interface that uses RSA 2048-bit
-// keys for signing and SHA256 for message hashing.
+// An implementation of the X509Signer interface that uses RSA keys with the
+// given algorithm for signing.
 class RsaX509Signer : public X509Signer {
  public:
-  // Creates an RSA 2048-bit X509Signer from the given PEM-encoded
-  // |serialized_private_key|.
+  enum SignatureAlgorithm {
+    RSASSA_PSS_WITH_SHA384,
+  };
+
+  // Creates an RSA X509Signer from the given PEM-encoded
+  // |serialized_private_key|, with signature algorithm |signature_algorithm|.
   static StatusOr<std::unique_ptr<RsaX509Signer>> CreateFromPem(
-      ByteContainerView serialized_private_key, const EVP_MD* hash);
+      ByteContainerView serialized_private_key,
+      SignatureAlgorithm signature_algorithm);
 
   int KeySizeInBits() const;
+
+  StatusOr<std::string> SerializePublicKeyToDer() const override;
 
   // From X509Signer.
   StatusOr<CleansingVector<char>> SerializeToPem() const override;
 
   Status SignX509(X509* x509) const override;
 
+  Status SignX509Req(X509_REQ* x509_req) const override;
+
  private:
-  explicit RsaX509Signer(bssl::UniquePtr<RSA> private_key, const EVP_MD* hash);
+  RsaX509Signer(bssl::UniquePtr<RSA> private_key,
+                SignatureAlgorithm signature_algorithm);
 
   bssl::UniquePtr<RSA> private_key_;
-  const EVP_MD* hash_;
+  SignatureAlgorithm signature_algorithm_;
 };
 
 }  // namespace asylo

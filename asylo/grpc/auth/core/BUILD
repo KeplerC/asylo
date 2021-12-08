@@ -105,21 +105,26 @@ cc_test(
         "//asylo/test/util:test_main",
         "//asylo/util:status",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest",
         "@com_google_protobuf//:protobuf_lite",
     ],
 )
 
-# Error space implementation for EKEP Abort error codes.
 cc_library(
-    name = "ekep_error_space",
-    srcs = ["ekep_error_space.cc"],
-    hdrs = ["ekep_error_space.h"],
+    name = "ekep_error_matchers",
+    testonly = 1,
+    srcs = ["ekep_error_matchers.cc"],
+    hdrs = ["ekep_error_matchers.h"],
     copts = ASYLO_DEFAULT_COPTS,
     deps = [
+        ":ekep_errors",
         ":handshake_cc_proto",
+        "//asylo/test/util:status_matchers",
+        "//asylo/util:proto_enum_util",
         "//asylo/util:status",
-        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_googletest//:gtest",
     ],
 )
 
@@ -130,10 +135,12 @@ cc_library(
     hdrs = ["ekep_errors.h"],
     copts = ASYLO_DEFAULT_COPTS,
     deps = [
-        ":ekep_error_space",
         ":handshake_cc_proto",
         "//asylo/util:status",
+        "//asylo/util:status_helpers",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:cord",
         "@com_google_absl//absl/types:optional",
     ],
 )
@@ -145,6 +152,7 @@ cc_test(
     copts = ASYLO_DEFAULT_COPTS,
     enclave_test_name = "ekep_errors_enclave_test",
     deps = [
+        ":ekep_error_matchers",
         ":ekep_errors",
         ":handshake_cc_proto",
         "//asylo/test/util:status_matchers",
@@ -162,7 +170,7 @@ cc_library(
     hdrs = ["ekep_crypto.h"],
     copts = ASYLO_DEFAULT_COPTS,
     deps = [
-        ":ekep_error_space",
+        ":ekep_errors",
         ":handshake_cc_proto",
         "//asylo/crypto:sha256_hash",
         "//asylo/crypto/util:bssl_util",
@@ -172,6 +180,7 @@ cc_library(
         "//asylo/util:proto_enum_util",
         "//asylo/util:status",
         "@boringssl//:crypto",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -184,7 +193,7 @@ cc_test(
     enclave_test_name = "ekep_crypto_enclave_test",
     deps = [
         ":ekep_crypto",
-        ":ekep_error_space",
+        ":ekep_error_matchers",
         ":handshake_cc_proto",
         "//asylo/crypto:sha256_hash",
         "//asylo/crypto/util:bytes",
@@ -204,11 +213,10 @@ cc_library(
     copts = ASYLO_DEFAULT_COPTS,
     deps = [
         ":ekep_crypto",
-        ":ekep_error_space",
+        ":ekep_errors",
         ":handshake_cc_proto",
         ":transcript",
         "//asylo/crypto:hash_interface",
-        "//asylo/crypto:sha256_hash",
         "//asylo/crypto/util:bssl_util",
         "//asylo/crypto/util:byte_container_view",
         "//asylo/grpc/auth/util:multi_buffer_input_stream",
@@ -234,7 +242,7 @@ cc_library(
     visibility = ["//asylo:implementation"],
     deps = [
         ":ekep_crypto",
-        ":ekep_error_space",
+        ":ekep_errors",
         ":ekep_handshaker",
         ":ekep_handshaker_util",
         ":handshake_cc_proto",
@@ -246,6 +254,7 @@ cc_library(
         "//asylo/util:status",
         "@boringssl//:crypto",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
         "@com_google_protobuf//:protobuf",
     ],
 )
@@ -259,7 +268,7 @@ cc_library(
     visibility = ["//asylo:implementation"],
     deps = [
         ":ekep_crypto",
-        ":ekep_error_space",
+        ":ekep_errors",
         ":ekep_handshaker",
         ":ekep_handshaker_util",
         ":handshake_cc_proto",
@@ -271,6 +280,7 @@ cc_library(
         "//asylo/util:status",
         "@boringssl//:crypto",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_protobuf//:protobuf",
     ],

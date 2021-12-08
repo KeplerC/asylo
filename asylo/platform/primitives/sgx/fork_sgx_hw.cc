@@ -21,6 +21,7 @@
 
 #include <atomic>
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -46,7 +47,7 @@
 #include "asylo/platform/primitives/trusted_runtime.h"
 #include "asylo/util/cleansing_types.h"
 #include "asylo/util/cleanup.h"
-#include "asylo/util/posix_error_space.h"
+#include "asylo/util/posix_errors.h"
 #include "asylo/util/status.h"
 
 namespace asylo {
@@ -161,7 +162,7 @@ Status BlockAndWaitOnEntries(int calling_thread_entry_count, int timeout) {
                   "Timeout while waiting for other TCS to exit the enclave");
   }
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Encrypts the enclave memory from |source_base| with |source_size| with
@@ -204,7 +205,7 @@ Status EncryptToUntrustedMemory(AeadCryptor *cryptor, const void *source_base,
   snapshot_entry->set_ciphertext_size(static_cast<uint64_t>(destination_size));
   snapshot_entry->set_nonce_base(reinterpret_cast<uint64_t>(nonce_base));
   snapshot_entry->set_nonce_size(static_cast<uint64_t>(nonce_size));
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Decrypts the untrusted source from |snapshot_entry| with |cryptor| to the
@@ -252,8 +253,8 @@ Status DecryptFromUntrustedMemory(AeadCryptor *cryptor,
 void CopyNonOkStatus(const Status &non_ok_status, absl::StatusCode *error_code,
                      char *error_message, size_t message_buffer_size) {
   *error_code = non_ok_status.code();
-  strncpy(error_message, non_ok_status.error_message().data(),
-          std::min(message_buffer_size, non_ok_status.error_message().size()));
+  strncpy(error_message, non_ok_status.message().data(),
+          std::min(message_buffer_size, non_ok_status.message().size()));
 }
 
 // Encrypts a whole memory region of size |source_size| at |source_base| in the
@@ -275,7 +276,7 @@ Status EncryptToSnapshot(AeadCryptor *cryptor, void *source_base,
     bytes_left -= plaintext_size;
     current_position += plaintext_size;
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Decrypts a whole memory region with |cryptor| from |entry|. The memory region
@@ -312,7 +313,7 @@ Status DecryptFromSnapshot(
     bytes_left -= actual_plaintext_size;
     current_position += actual_plaintext_size;
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 }  // namespace
@@ -445,8 +446,7 @@ Status TakeSnapshotForFork(SnapshotLayout *snapshot_layout) {
                       ABSL_ARRAYSIZE(error_message));
       break;
     }
-    std::unique_ptr<AeadCryptor> cryptor =
-        std::move(cryptor_result.ValueOrDie());
+    std::unique_ptr<AeadCryptor> cryptor = std::move(cryptor_result.value());
 
     // Allocate and encrypt reserved data section to an untrusted snapshot.
     status = EncryptToSnapshot(cryptor.get(), enclave_layout.reserved_data_base,
@@ -530,7 +530,7 @@ Status TakeSnapshotForFork(SnapshotLayout *snapshot_layout) {
   // enclave snapshot and host fork() are consistent. Also to make sure other
   // threads are not holding locks while entering/exiting the enclave when
   // fork() is invoked on the host..
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Decrypts and restores the enclave data/bss section and heap from
@@ -577,7 +577,7 @@ Status DecryptAndRestoreEnclaveDataBssHeap(
   // data and bss. We should set to the memory address before overwriting the
   // data, to avoid overwriting the existing memory on the switched heap.
   heap_switch(switched_heap_next, switched_heap_remaining);
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Decrypts and restores the thread information and stack of the thread that
@@ -608,7 +608,7 @@ Status DecryptAndRestoreThreadStack(
       DecryptFromSnapshot(cryptor.get(), thread_layout.stack_limit, stack_size,
                           snapshot_layout.stack()));
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Restore the current enclave states from an untrusted snapshot.
@@ -695,7 +695,7 @@ Status RestoreForFork(const char *input, size_t input_len) {
 
   // Only allow other entries if restoring the child enclave succeeds.
   enc_unblock_entries();
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Do a full EKEP handshake between the parent and the child enclave.
@@ -716,7 +716,7 @@ Status RunEkepHandshake(EkepHandshaker *handshaker, bool is_parent,
     // enc_untrusted_write to write to it.
     if (enc_untrusted_write(socket, outgoing_bytes.c_str(),
                             outgoing_bytes.size()) <= 0) {
-      return Status(static_cast<error::PosixError>(errno), "Write failed");
+      return LastPosixError("Write failed");
     }
   }
 
@@ -731,7 +731,7 @@ Status RunEkepHandshake(EkepHandshaker *handshaker, bool is_parent,
           enc_untrusted_recvfrom(socket, buf, sizeof(buf), MSG_PEEK,
                                  /*src_addr=*/nullptr, /*addrlen=*/nullptr);
       if (bytes_received <= 0) {
-        return Status(static_cast<error::PosixError>(errno), "Read failed");
+        return LastPosixError("Read failed");
       }
       result =
           handshaker->NextHandshakeStep(buf, bytes_received, &outgoing_bytes);
@@ -745,7 +745,7 @@ Status RunEkepHandshake(EkepHandshaker *handshaker, bool is_parent,
         if (!unused_bytes_result.ok()) {
           return unused_bytes_result.status();
         }
-        size_t unused_bytes_size = unused_bytes_result.ValueOrDie().size();
+        size_t unused_bytes_size = unused_bytes_result.value().size();
         bytes_used -= unused_bytes_size;
       }
       // Remove the used data from the receiving buffer.
@@ -765,10 +765,10 @@ Status RunEkepHandshake(EkepHandshaker *handshaker, bool is_parent,
 
     if (enc_untrusted_write(socket, outgoing_bytes.c_str(),
                             outgoing_bytes.size()) <= 0) {
-      return Status(static_cast<error::PosixError>(errno), "Write failed");
+      return LastPosixError("Write failed");
     }
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Compares the identity of the current enclave with |peer_identity|. In the
@@ -800,7 +800,7 @@ Status ComparePeerAndSelfIdentity(const EnclaveIdentity &peer_identity) {
             "The identity of the peer enclave does not match expectation: ",
             explanation));
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Encrypts and transfers snapshot key to the child.
@@ -843,10 +843,10 @@ Status EncryptAndSendSnapshotKey(std::unique_ptr<AeadCryptor> cryptor,
   // Sends the serialized encrypted snapshot key to the child.
   if (enc_untrusted_write(socket, encrypted_snapshot_key_string.data(),
                           encrypted_snapshot_key_string.size()) <= 0) {
-    return Status(static_cast<error::PosixError>(errno), "Write failed");
+    return LastPosixError("Write failed");
   }
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Receives the snapshot key from the parent, and decrypts the key.
@@ -855,7 +855,7 @@ Status ReceiveSnapshotKey(std::unique_ptr<AeadCryptor> cryptor, int socket) {
   char buf[1024];
   int rc = enc_untrusted_read(socket, buf, sizeof(buf));
   if (rc <= 0) {
-    return Status(static_cast<error::PosixError>(errno), "Read failed");
+    return LastPosixError("Read failed");
   }
 
   EncryptedSnapshotKey encrypted_snapshot_key;
@@ -887,7 +887,7 @@ Status ReceiveSnapshotKey(std::unique_ptr<AeadCryptor> cryptor, int socket) {
     return Status(absl::StatusCode::kInternal,
                   "Failed to save snapshot key inside enclave");
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Securely transfer the snapshot key. First create a shared secret from an EKEP
@@ -946,10 +946,10 @@ Status TransferSecureSnapshotKey(
 
   // Get peer identity from the handshake, and compare it with the identity
   // of the current enclave.
-  EnclaveIdentity peer_identity =
-      handshaker->GetPeerIdentities().ValueOrDie()->identities(0);
-
-  ASYLO_RETURN_IF_ERROR(ComparePeerAndSelfIdentity(peer_identity));
+  std::unique_ptr<EnclaveIdentities> peer_identities;
+  ASYLO_ASSIGN_OR_RETURN(peer_identities, handshaker->GetPeerIdentities());
+  ASYLO_RETURN_IF_ERROR(
+      ComparePeerAndSelfIdentity(peer_identities->identities(0)));
 
   // Initialize a cryptor with the AES128-GCM record protocol key from the EKEP
   // handshake.

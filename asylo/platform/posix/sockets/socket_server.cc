@@ -26,8 +26,9 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "absl/status/status.h"
 #include "asylo/util/logging.h"
-#include "asylo/util/posix_error_space.h"
+#include "asylo/util/posix_errors.h"
 
 namespace asylo {
 namespace {
@@ -77,14 +78,14 @@ Status SocketServer::ServerSetup(int server_port) {
   int fd = socket(AF_INET6, SOCK_STREAM, 0);
   if (fd < 0) {
     LOG(ERROR) << kLogOrigin << "server socket error";
-    return Status(static_cast<error::PosixError>(errno), "socket error");
+    return LastPosixError("socket error");
   }
 
   socket_fd_.reset(fd);
 
   if (MakeSockaddrReusable(fd)) {
     LOG(ERROR) << kLogOrigin << "server setsockopt error";
-    return Status(static_cast<error::PosixError>(errno), "setsockopt error");
+    return LastPosixError("setsockopt error");
   }
 
   struct sockaddr_in6 serv_addr;
@@ -104,7 +105,7 @@ Status SocketServer::ServerSetup(const std::string &socket_name,
   int fd = socket(AF_UNIX, SOCK_STREAM, 0);
   if (fd < 0) {
     LOG(ERROR) << kLogOrigin << "server socket error";
-    return Status(static_cast<error::PosixError>(errno), "socket error");
+    return LastPosixError("socket error");
   }
 
   socket_fd_.reset(fd);
@@ -128,13 +129,13 @@ Status SocketServer::ServerAccept() {
   connection_fd_ = accept(socket_fd_.get(), nullptr, nullptr);
   if (connection_fd_ < 0) {
     LOG(ERROR) << kLogOrigin << "server accept error";
-    return Status(static_cast<error::PosixError>(errno), "accept error");
+    return LastPosixError("accept error");
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status SocketServer::ServerRoundtripTransmit(int buf_len, int round_trip) {
-  Status status = Status::OkStatus();
+  Status status = absl::OkStatus();
   std::unique_ptr<char[]> transmit_buf(new char[buf_len]);
   char *buf = transmit_buf.get();
 
@@ -181,13 +182,13 @@ Status SocketServer::ServerConnection(int fd, struct sockaddr *serv_addr,
                                       socklen_t addrlen) {
   if (bind(fd, serv_addr, addrlen)) {
     LOG(ERROR) << kLogOrigin << "server bind error";
-    return Status(static_cast<error::PosixError>(errno), "bind error");
+    return LastPosixError("bind error");
   }
   if (listen(fd, 1)) {
     LOG(ERROR) << kLogOrigin << "server listen error";
-    return Status(static_cast<error::PosixError>(errno), "listen error");
+    return LastPosixError("listen error");
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 }  // namespace asylo

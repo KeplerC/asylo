@@ -48,7 +48,6 @@
 #include "asylo/platform/primitives/util/status_conversions.h"
 #include "asylo/platform/storage/utils/fd_closer.h"
 #include "asylo/test/util/enclave_test_application.h"
-#include "asylo/util/posix_error_space.h"
 #include "asylo/util/posix_errors.h"
 #include "asylo/util/status_macros.h"
 #include "asylo/util/statusor.h"
@@ -186,7 +185,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     }
     regfree(&regex);
 
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
  private:
@@ -318,7 +317,7 @@ class SyscallsEnclave : public EnclaveTestCase {
       return Status(absl::StatusCode::kInternal,
                     "Bytes read from file does not match specified size");
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status CompareFiles(int fd1, int fd2, int size) {
@@ -343,7 +342,7 @@ class SyscallsEnclave : public EnclaveTestCase {
           absl::StatusCode::kInternal,
           absl::StrCat("Fd:", fd1, " and fd:", fd2, " are different"));
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -444,7 +443,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status ExpectErrno(int expected_errno, int retval) {
@@ -461,7 +460,7 @@ class SyscallsEnclave : public EnclaveTestCase {
                                  saved_errno));
     }
 
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -471,20 +470,17 @@ class SyscallsEnclave : public EnclaveTestCase {
   Status RunIfIndexToNameTest() {
     struct ifaddrs *addrs, *addr;
     if (getifaddrs(&addrs) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("getifaddrs failed: ", strerror(errno)));
+      return LastPosixError("getifaddrs failed");
     }
 
     for (addr = addrs; addr != nullptr; addr = addr->ifa_next) {
       unsigned int ifindex = if_nametoindex(addr->ifa_name);
       if (ifindex == 0) {
-        return Status(static_cast<error::PosixError>(errno),
-                      absl::StrCat("if_nametoindex failed: ", strerror(errno)));
+        return LastPosixError("if_nametoindex failed");
       }
       char ifname[IF_NAMESIZE];
       if (!if_indextoname(ifindex, ifname)) {
-        return Status(static_cast<error::PosixError>(errno),
-                      absl::StrCat("if_indextoname failed: ", strerror(errno)));
+        return LastPosixError("if_indextoname failed");
       }
       if (memcmp(addr->ifa_name, ifname, strlen(ifname)) != 0) {
         return Status(
@@ -494,25 +490,23 @@ class SyscallsEnclave : public EnclaveTestCase {
     }
     freeifaddrs(addrs);
 
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunIfNameToIndexTest() {
     struct ifaddrs *addrs, *addr;
     if (getifaddrs(&addrs) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("getifaddrs failed: ", strerror(errno)));
+      return LastPosixError("getifaddrs failed");
     }
 
     for (addr = addrs; addr != nullptr; addr = addr->ifa_next) {
       if (if_nametoindex(addr->ifa_name) == 0) {
-        return Status(static_cast<error::PosixError>(errno),
-                      absl::StrCat("if_nametoindex failed: ", strerror(errno)));
+        return LastPosixError("if_nametoindex failed");
       }
     }
     freeifaddrs(addrs);
 
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -529,7 +523,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -657,7 +651,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunSchedGetAffinityTest(EnclaveOutput *output) {
@@ -675,7 +669,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunSchedGetAffinityFailureTest(EnclaveOutput *output) {
@@ -692,7 +686,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -707,18 +701,16 @@ class SyscallsEnclave : public EnclaveTestCase {
     // Create a file and rename it.
     int fd = open((path + "/oldname").c_str(), O_RDWR | O_CREAT, 0777);
     if (fd < 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("failed to create file in: ", path,
-                                 ", error: ", strerror(errno)));
+      return LastPosixError(
+          absl::StrCat("failed to create file in: ", path, ", error"));
     }
     close(fd);
     if (rename((path + "/oldname").c_str(), (path + "/rename").c_str()) < 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("failed to rename file in: ", path,
-                                 ", error: ", strerror(errno)));
+      return LastPosixError(
+          absl::StrCat("failed to rename file in: ", path, ", error"));
     }
 
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -730,8 +722,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     void *ptr = mmap(nullptr, 10000, PROT_READ | PROT_WRITE,
                      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
     if (ptr == MAP_FAILED) {
-      return Status(static_cast<error::PosixError>(errno),
-                    "mmap(MAP_ANONYMOUS) failed");
+      return LastPosixError("mmap(MAP_ANONYMOUS) failed");
     }
     intptr_t address = reinterpret_cast<intptr_t>(ptr);
     if ((address & 4095) != 0) {
@@ -744,9 +735,9 @@ class SyscallsEnclave : public EnclaveTestCase {
                     "mmap(MAP_ANONYMOUS) returned uninitialized memory");
     }
     if (munmap(ptr, 10000) != 0) {
-      return Status(static_cast<error::PosixError>(errno), "munmap() failed");
+      return LastPosixError("munmap() failed");
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -760,20 +751,18 @@ class SyscallsEnclave : public EnclaveTestCase {
     set_limit.rlim_cur = soft_limit;
     set_limit.rlim_max = hard_limit;
     if (setrlimit(RLIMIT_NOFILE, &set_limit) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("setrlimit failed:", strerror(errno)));
+      return LastPosixError("setrlimit failed");
     }
     struct rlimit get_limit;
     if (getrlimit(RLIMIT_NOFILE, &get_limit) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("getrlimit failed:", strerror(errno)));
+      return LastPosixError("getrlimit failed");
     }
     if (get_limit.rlim_cur != soft_limit || get_limit.rlim_max != hard_limit) {
       return Status(absl::StatusCode::kInternal,
                     "The file descriptor number limit from getrlimit is "
                     "different from the value set");
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunRlimitLowNoFileTest(const std::string &path) {
@@ -784,24 +773,22 @@ class SyscallsEnclave : public EnclaveTestCase {
     set_limit.rlim_cur = file_descriptor_used;
     set_limit.rlim_max = file_descriptor_used;
     if (setrlimit(RLIMIT_NOFILE, &set_limit) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("setrlimit failed:", strerror(errno)));
+      return LastPosixError("setrlimit failed");
     }
     auto fd_or_error = OpenFile(path, O_CREAT | O_RDWR, 0644);
     if (fd_or_error.ok()) {
       return Status(absl::StatusCode::kInternal,
-                    absl::StrCat("File descriptor: ", fd_or_error.ValueOrDie(),
+                    absl::StrCat("File descriptor: ", fd_or_error.value(),
                                  " is used while the rlimit is set to: ",
                                  file_descriptor_used));
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunRlimitInvalidNoFileTest(const std::string &path) {
     struct rlimit get_limit;
     if (getrlimit(RLIMIT_NOFILE, &get_limit) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("getrlimit failed:", strerror(errno)));
+      return LastPosixError("getrlimit failed");
     }
     int old_soft_limit = get_limit.rlim_cur;
     int old_hard_limit = get_limit.rlim_max;
@@ -819,8 +806,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     }
     // Checks that the limit is unchanged after a failed setrlimit.
     if (getrlimit(RLIMIT_NOFILE, &get_limit) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("getrlimit failed:", strerror(errno)));
+      return LastPosixError("getrlimit failed");
     }
 
     // setrlimit should fail if the soft limit is higher than the hard limit.
@@ -858,8 +844,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     set_limit.rlim_cur = 100;
     set_limit.rlim_max = 100;
     if (setrlimit(RLIMIT_NOFILE, &set_limit) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("setrlimit failed:", strerror(errno)));
+      return LastPosixError("setrlimit failed");
     }
     set_limit.rlim_cur = 200;
     set_limit.rlim_max = 200;
@@ -869,7 +854,7 @@ class SyscallsEnclave : public EnclaveTestCase {
           "setrlimit to increase the hard limit unexpectedly succeeded");
     }
 
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -934,8 +919,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     int fds[2];
     int ret = pipe(fds);
     if (ret != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    "couldn't create pipe");
+      return LastPosixError("couldn't create pipe");
     }
 
     sockaddr sa;
@@ -957,10 +941,9 @@ class SyscallsEnclave : public EnclaveTestCase {
     }
 
     if (getsockname(fd, &sa, &sa_len) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    "getSockname failed");
+      return LastPosixError("getSockname failed");
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
   // EBADF: Returned if you pass an invalid file descriptor.
   Status RunGetSocknameFailureTest_EBADF() {
@@ -1004,8 +987,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     int fds[2];
     int ret = pipe(fds);
     if (ret != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    "couldn't create pipe");
+      return LastPosixError("couldn't create pipe");
     }
 
     sockaddr sa;
@@ -1019,24 +1001,21 @@ class SyscallsEnclave : public EnclaveTestCase {
 
   Status RunChModTest(const std::string &path) {
     if (chmod(path.c_str(), 0644) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("chmod failed: ", strerror(errno)));
+      return LastPosixError("chmod failed");
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunFChModTest(const std::string &path) {
     int fd = open(path.c_str(), O_RDWR | O_CREAT, 0777);
     if (fd < 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("failed to open file: ", strerror(errno)));
+      return LastPosixError("failed to open file");
     }
 
     if (fchmod(fd, 0644) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("fchmod failed: ", strerror(errno)));
+      return LastPosixError("fchmod failed");
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunFStatTest(const std::string &path, EnclaveOutput *output) {
@@ -1059,7 +1038,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunLStatTest(const std::string &path, EnclaveOutput *output) {
@@ -1073,7 +1052,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunMkdirTest(const std::string &path) {
@@ -1090,10 +1069,9 @@ class SyscallsEnclave : public EnclaveTestCase {
     }
 
     if (mkdir(path.c_str(), 0644) == -1) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("Mkdir:", path, " failed: ", strerror(errno)));
+      return LastPosixError(absl::StrCat("Mkdir:", path, " failed"));
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunStatTest(const std::string &path, EnclaveOutput *output) {
@@ -1107,7 +1085,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunUmaskTest(const std::string &path) {
@@ -1135,7 +1113,7 @@ class SyscallsEnclave : public EnclaveTestCase {
       return Status(absl::StatusCode::kInternal,
                     "Open creates a file with masked file modes");
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -1180,7 +1158,7 @@ class SyscallsEnclave : public EnclaveTestCase {
       return Status(absl::StatusCode::kInternal, "getitimer failure 2");
     }
 
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -1201,9 +1179,8 @@ class SyscallsEnclave : public EnclaveTestCase {
                     "Bytes written to file does not match message size");
     }
     if (lseek(fd, 0, SEEK_SET) == -1) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("Moving to beginning of fd:", fd,
-                                 " failed: ", strerror(errno)));
+      return LastPosixError(
+          absl::StrCat("Moving to beginning of fd:", fd, " failed"));
     }
     struct iovec iov[num_messages];
     memset(iov, 0, sizeof(iov));
@@ -1227,7 +1204,7 @@ class SyscallsEnclave : public EnclaveTestCase {
       return Status(absl::StatusCode::kInternal,
                     "Messages from readv do not match the expected message.");
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunWritevTest(const std::string &path) {
@@ -1247,15 +1224,13 @@ class SyscallsEnclave : public EnclaveTestCase {
     int size = message.size();
     ssize_t rc = writev(fd, iov, num_messages);
     if (rc != size) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("writev return:", rc,
-                                 " does not match message size:", size));
+      return LastPosixError(absl::StrCat(
+          "writev return:", rc, " does not match message size:", size));
     }
 
     if (lseek(fd, 0, SEEK_SET) == -1) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("Moving to beginning of fd:", fd,
-                                 " failed: ", strerror(errno)));
+      return LastPosixError(
+          absl::StrCat("Moving to beginning of fd:", fd, " failed"));
     }
 
     char buf[1024];
@@ -1265,7 +1240,7 @@ class SyscallsEnclave : public EnclaveTestCase {
                     absl::StrCat("Message read from fd:", fd, ":", buf,
                                  " is different from the message of writev."));
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -1288,7 +1263,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   //////////////////////////////////////
@@ -1353,7 +1328,7 @@ class SyscallsEnclave : public EnclaveTestCase {
                                  " error"));
     }
 
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunGetCwdTest(bool provide_buffer, int32_t buffer_size,
@@ -1369,7 +1344,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunGetEgidTest(EnclaveOutput *output) {
@@ -1378,7 +1353,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunGetEuidTest(EnclaveOutput *output) {
@@ -1387,7 +1362,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunGetHostNameTest(EnclaveOutput *output) {
@@ -1404,7 +1379,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunGetGidTest(EnclaveOutput *output) {
@@ -1413,7 +1388,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunGetPidTest(EnclaveOutput *output) {
@@ -1422,7 +1397,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunGetPpidTest(EnclaveOutput *output) {
@@ -1431,7 +1406,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunGetUidTest(EnclaveOutput *output) {
@@ -1440,7 +1415,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunLinkTest(const std::string &path) {
@@ -1456,9 +1431,8 @@ class SyscallsEnclave : public EnclaveTestCase {
     platform::storage::FdCloser from_fd_closer(from_fd);
     size_t rc = write(from_fd, path.c_str(), path.size());
     if (rc != path.size()) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("Failed to write to file:", from_path,
-                                 " error:", strerror(errno)));
+      return LastPosixError(
+          absl::StrCat("Failed to write to file:", from_path, " error"));
     }
     if (link(from_path.c_str(), to_path.c_str()) == -1) {
       return LastPosixError(
@@ -1477,7 +1451,7 @@ class SyscallsEnclave : public EnclaveTestCase {
           absl::StrCat("The content:", buf, " from linked path:", to_path,
                        " is different from the original path:", from_path));
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunPReadTest(const std::string &path) {
@@ -1509,7 +1483,7 @@ class SyscallsEnclave : public EnclaveTestCase {
                        " does not match expected: ", message2.data()));
     }
 
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunRmDirTest(const std::string &path) {
@@ -1518,10 +1492,9 @@ class SyscallsEnclave : public EnclaveTestCase {
     }
 
     if (rmdir(path.c_str()) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("Rmdir:", path, " failed: ", strerror(errno)));
+      return LastPosixError(absl::StrCat("Rmdir:", path, " failed"));
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunSysconfTest(EnclaveOutput *output, int name) {
@@ -1530,7 +1503,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     if (output) {
       output->MutableExtension(syscalls_test_output)->CopyFrom(output_ret);
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunTruncateTest(const std::string &path) {
@@ -1543,8 +1516,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     const std::string message = message1 + message2 + message3;
     ssize_t rc = write(fd, message.c_str(), message.size());
     if (rc != message.size()) {
-      return Status(
-          static_cast<error::PosixError>(errno),
+      return LastPosixError(
           absl::StrCat("write returns: ", rc,
                        " does not match message size: ", message.size()));
     }
@@ -1553,9 +1525,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     // message2.
     std::string truncated_message = message1 + message2;
     if (truncate(path.c_str(), truncated_message.size()) != 0) {
-      return Status(
-          static_cast<error::PosixError>(errno),
-          absl::StrCat("Truncate file: ", path, " failed: ", strerror(errno)));
+      return LastPosixError(absl::StrCat("Truncate file: ", path, " failed"));
     }
     if (lseek(fd, 0, SEEK_SET) == -1) {
       return LastPosixError(
@@ -1576,9 +1546,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     // Now call ftruncate to truncate the file to the size of only message1.
     truncated_message = message1;
     if (ftruncate(fd, truncated_message.size()) != 0) {
-      return Status(
-          static_cast<error::PosixError>(errno),
-          absl::StrCat("Ftruncate file: ", fd, " failed: ", strerror(errno)));
+      return LastPosixError(absl::StrCat("Ftruncate file: ", fd, " failed"));
     }
     if (lseek(fd, 0, SEEK_SET) == -1) {
       return LastPosixError(
@@ -1595,7 +1563,7 @@ class SyscallsEnclave : public EnclaveTestCase {
           absl::StrCat("Message read from truncated file is: ", buf1,
                        " and does not match expected: ", truncated_message));
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunUnlinkTest(const std::string &path) {
@@ -1603,9 +1571,7 @@ class SyscallsEnclave : public EnclaveTestCase {
     ASYLO_ASSIGN_OR_RETURN(fd, OpenFile(path, O_CREAT | O_RDWR, 0644));
     close(fd);
     if (unlink(path.c_str()) == -1) {
-      return Status(
-          static_cast<error::PosixError>(errno),
-          absl::StrCat("Unlink file ", path, "failed: ", strerror(errno)));
+      return LastPosixError(absl::StrCat("Unlink file ", path, "failed"));
     }
     fd = open(path.c_str(), O_RDWR);
     if (fd >= 0) {
@@ -1614,7 +1580,7 @@ class SyscallsEnclave : public EnclaveTestCase {
           absl::StatusCode::kInternal,
           absl::StrCat("File ", path, " is still available after unlink"));
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status RunUtimesTest(const std::string &path) {
@@ -1623,9 +1589,8 @@ class SyscallsEnclave : public EnclaveTestCase {
     }
 
     if (open(path.c_str(), O_RDWR | O_CREAT, 0777) < 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("failed to create file in: ", path,
-                                 ", error: ", strerror(errno)));
+      return LastPosixError(
+          absl::StrCat("failed to create file in: ", path, ", error"));
     }
 
     // Set the access and modification time to be a random value larger than the
@@ -1642,16 +1607,14 @@ class SyscallsEnclave : public EnclaveTestCase {
     times[1].tv_sec += random_modification_time_shift;
 
     if (utimes(path.c_str(), times) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("utimes failed: ", strerror(errno)));
+      return LastPosixError("utimes failed");
     }
 
     // Get the access and modification time of the file to verify they are set
     // correctly.
     struct stat stat_buffer;
     if (stat(path.c_str(), &stat_buffer) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("stat failed: ", strerror(errno)));
+      return LastPosixError("stat failed");
     }
 
     if (stat_buffer.st_atime != times[0].tv_sec) {
@@ -1664,7 +1627,7 @@ class SyscallsEnclave : public EnclaveTestCase {
                     "Modification time is not set correctly");
     }
 
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 };
 

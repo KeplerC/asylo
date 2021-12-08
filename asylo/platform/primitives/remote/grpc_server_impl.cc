@@ -35,7 +35,6 @@
 #include "asylo/platform/primitives/remote/grpc_service.grpc.pb.h"
 #include "asylo/platform/primitives/remote/grpc_service.pb.h"
 #include "asylo/platform/primitives/remote/metrics/proc_system_service.h"
-#include "asylo/util/posix_error_space.h"
 #include "asylo/util/status.h"
 #include "asylo/util/status_helpers.h"
 #include "asylo/util/status_macros.h"
@@ -74,7 +73,7 @@ class ServerInvocation : public Communicator::Invocation {
   ~ServerInvocation() override {
     // Serialize into response.
     CommunicationMessage response;
-    if (status.Is(absl::StatusCode::kUnknown)) {
+    if (status.code() == absl::StatusCode::kUnknown) {
       // UNKNOWN status indicates request, cannot be returned with response.
       status = Status{
           absl::StatusCode::kFailedPrecondition,

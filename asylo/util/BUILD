@@ -140,6 +140,7 @@ cc_library(
     copts = ASYLO_DEFAULT_COPTS,
     visibility = ["//asylo:implementation"],
     deps = [
+        ":posix_errors",
         ":status",
         "//asylo/util:logging",
         "@com_google_absl//absl/status",
@@ -174,6 +175,7 @@ cc_library(
     visibility = ["//asylo:implementation"],
     deps = [
         ":cleanup",
+        ":posix_errors",
         ":status",
         "//asylo/util:logging",
         "@com_google_absl//absl/strings",
@@ -291,6 +293,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -345,6 +348,7 @@ cc_test(
         "//asylo/test/util:status_matchers",
         "//asylo/test/util:test_main",
         "@com_github_grpc_grpc//:grpc++",
+        "@com_github_grpc_grpc//:grpc++_codegen_base",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -372,6 +376,7 @@ cc_test(
         "//asylo/test/util:status_matchers",
         "//asylo/test/util:test_main",
         "@com_google_absl//absl/base:config",
+        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -390,6 +395,7 @@ cc_test(
         "//asylo/test/util:status_matchers",
         "//asylo/test/util:test_main",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest",
     ],
@@ -408,6 +414,10 @@ cc_library(
         ":status",
         ":status_cc_proto",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:cord",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 
@@ -420,12 +430,19 @@ cc_test(
         ":error_codes",
         ":status",
         ":status_helpers",
-        "//asylo/platform/primitives/sgx:sgx_error_space",
+        "//asylo:enclave_cc_proto",
+        "//asylo/platform/primitives/sgx:sgx_errors",
+        "//asylo/test/util:proto_matchers",
+        "//asylo/test/util:status_matchers",
         "//asylo/test/util:test_main",
         "@com_github_grpc_grpc//:grpc++",
+        "@com_github_grpc_grpc//:grpc++_codegen_base",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:cord",
+        "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest",
+        "@com_google_protobuf//:protobuf",
         "@com_google_protobuf//:protobuf_lite",
         "@linux_sgx//:public",
     ],
@@ -493,6 +510,21 @@ cc_test(
 )
 
 cc_library(
+    name = "posix_error_matchers",
+    testonly = 1,
+    srcs = ["posix_error_matchers.cc"],
+    hdrs = ["posix_error_matchers.h"],
+    copts = ASYLO_DEFAULT_COPTS,
+    visibility = ["//visibility:public"],
+    deps = [
+        ":posix_errors",
+        ":status",
+        "//asylo/test/util:status_matchers",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
+cc_library(
     name = "posix_errors",
     srcs = ["posix_errors.cc"],
     hdrs = ["posix_errors.h"],
@@ -511,6 +543,7 @@ cc_test(
     copts = ASYLO_DEFAULT_COPTS,
     enclave_test_name = "posix_errors_enclave_test",
     deps = [
+        ":posix_error_matchers",
         ":posix_errors",
         ":status",
         "//asylo/test/util:status_matchers",
@@ -821,6 +854,8 @@ cc_library(
     visibility = ["//asylo:implementation"],
     deps = [
         ":status",
+        "@com_github_grpc_grpc//:gpr",
+        "@com_github_grpc_grpc//:gpr_codegen",
         "@com_github_grpc_grpc//:grpc",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
@@ -847,6 +882,8 @@ cc_test(
         "//asylo/test/util:status_matchers",
         "//asylo/test/util:test_main",
         "//asylo/util:logging",
+        "@com_github_grpc_grpc//:gpr",
+        "@com_github_grpc_grpc//:gpr_codegen",
         "@com_github_grpc_grpc//:grpc",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",

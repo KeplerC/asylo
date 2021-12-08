@@ -53,6 +53,7 @@
 #include "asylo/util/logging.h"
 #include "asylo/util/proto_enum_util.h"
 #include "asylo/util/status.h"
+#include "asylo/util/status_helpers.h"
 #include "asylo/util/status_macros.h"
 #include "asylo/util/statusor.h"
 
@@ -185,6 +186,7 @@ StatusOr<bssl::UniquePtr<EVP_PKEY>> CreatePublicKey(
 
       return std::move(evp_key);
     }
+    case NID_rsassaPss:
     case NID_sha256WithRSAEncryption: {
       uint8_t const *public_key_data = public_key_der.data();
 
@@ -259,6 +261,34 @@ StatusOr<std::string> ToDerEncoding(X509 *x509) {
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
 
+  return std::string(data, length);
+}
+
+StatusOr<std::string> ToPemEncoding(X509_REQ *x509_req) {
+  bssl::UniquePtr<BIO> x509_bio(BIO_new(BIO_s_mem()));
+  if (PEM_write_bio_X509_REQ(x509_bio.get(), x509_req) != 1) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
+
+  char *data;
+  long length = BIO_get_mem_data(x509_bio.get(), &data);
+  if (length <= 0) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
+  return std::string(data, length);
+}
+
+StatusOr<std::string> ToDerEncoding(X509_REQ *x509_req) {
+  bssl::UniquePtr<BIO> x509_bio(BIO_new(BIO_s_mem()));
+  if (i2d_X509_REQ_bio(x509_bio.get(), x509_req) != 1) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
+
+  char *data;
+  long length = BIO_get_mem_data(x509_bio.get(), &data);
+  if (length <= 0) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
   return std::string(data, length);
 }
 
@@ -372,7 +402,7 @@ Status AddSingleExtension(X509_EXTENSION *x509_extension, X509 *x509) {
   if (X509_add_ext(x509, x509_extension, /*loc=*/kAddExtensionToEnd) != 1) {
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Sets the X.509 version in |x509|.
@@ -380,7 +410,16 @@ Status SetVersion(X509Version version, X509 *x509) {
   if (X509_set_version(x509, static_cast<long>(version)) != 1) {
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
+}
+
+// Sets the PKCS 10 version in |x509_req|.
+Status SetVersion(Pkcs10Version version, X509_REQ *x509_req) {
+  if (X509_REQ_set_version(x509_req,
+                           static_cast<long>(version)) != 1) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
+  return absl::OkStatus();
 }
 
 // Sets the serial number in |x509|.
@@ -399,7 +438,7 @@ Status SetSerialNumber(const BIGNUM &serial_number, X509 *x509) {
   if (X509_set_serialNumber(x509, serial_asn1_integer.get()) != 1) {
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Sets the issuer name in |x509|.
@@ -409,7 +448,7 @@ Status SetIssuerName(const X509Name &name, X509 *x509) {
   if (X509_set_issuer_name(x509, x509_name.get()) != 1) {
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Sets the validity period in |x509|.
@@ -423,7 +462,7 @@ Status SetValidity(X509Validity validity, X509 *x509) {
   if (X509_set_notAfter(x509, asn1_time.get()) != 1) {
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // Sets the subject name in |x509|.
@@ -433,7 +472,17 @@ Status SetSubjectName(const X509Name &name, X509 *x509) {
   if (X509_set_subject_name(x509, x509_name.get()) != 1) {
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
+}
+
+// Sets the subject name in |x509_req|.
+Status SetSubjectName(const X509Name &name, X509_REQ *x509_req) {
+  bssl::UniquePtr<X509_NAME> x509_name;
+  ASYLO_ASSIGN_OR_RETURN(x509_name, WriteName(name));
+  if (X509_REQ_set_subject_name(x509_req, x509_name.get()) != 1) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
+  return absl::OkStatus();
 }
 
 // Sets the subject key in |x509|.
@@ -448,7 +497,23 @@ Status SetSubjectPublicKey(absl::string_view subject_key_der, X509 *x509) {
   if (X509_set_pubkey(x509, evp_pkey.get()) != 1) {
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
+}
+
+// Sets the subject key in |x509_req|.
+Status SetSubjectPublicKey(absl::string_view subject_key_der,
+                           X509_REQ *x509_req) {
+  const unsigned char *der_data =
+      reinterpret_cast<const unsigned char *>(subject_key_der.data());
+  bssl::UniquePtr<EVP_PKEY> evp_pkey(d2i_PUBKEY(
+      /*out=*/nullptr, &der_data, subject_key_der.size()));
+  if (evp_pkey == nullptr) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
+  if (X509_REQ_set_pubkey(x509_req, evp_pkey.get()) != 1) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
+  return absl::OkStatus();
 }
 
 // Sets the authority key identifier in |x509|.
@@ -534,7 +599,8 @@ Status SetKeyUsage(KeyUsageInformation key_usage, X509 *x509) {
 // Sets the basic constraints in |x509|.
 Status SetBasicConstraints(BasicConstraints basic_constraints, X509 *x509) {
   bssl::UniquePtr<BASIC_CONSTRAINTS> bssl_constraints(BASIC_CONSTRAINTS_new());
-  bssl_constraints->ca = basic_constraints.is_ca ? 1 : 0;
+  // DER encodes TRUE as 0xff. See X.690 (08/2015) section 11.1.
+  bssl_constraints->ca = basic_constraints.is_ca ? 0xff : 0;
   if (basic_constraints.pathlen.has_value()) {
     Asn1Value integer;
     ASYLO_ASSIGN_OR_RETURN(integer, Asn1Value::CreateIntegerFromInt(
@@ -620,7 +686,7 @@ Status AddExtensions(absl::Span<const X509Extension> extensions, X509 *x509) {
     }
     ASYLO_RETURN_IF_ERROR(AddSingleExtension(x509_extension.get(), x509));
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 }  // namespace
@@ -664,59 +730,84 @@ StatusOr<std::unique_ptr<X509Certificate>> X509CertificateBuilder::SignAndBuild(
   }
 
   bssl::UniquePtr<X509> x509(X509_new());
+  ASYLO_RETURN_IF_ERROR(WithContext(SetVersion(version, x509.get()),
+                                    "Failed to set X.509 version: "));
   ASYLO_RETURN_IF_ERROR(
-      SetVersion(version, x509.get())
-          .WithPrependedContext("Failed to set X.509 version: "));
+      WithContext(SetSerialNumber(*serial_number, x509.get()),
+                  "Failed to set certificate serial number: "));
+  ASYLO_RETURN_IF_ERROR(WithContext(SetIssuerName(issuer.value(), x509.get()),
+                                    "Failed to set certificate issuer name: "));
   ASYLO_RETURN_IF_ERROR(
-      SetSerialNumber(*serial_number, x509.get())
-          .WithPrependedContext("Failed to set certificate serial number: "));
+      WithContext(SetValidity(validity.value(), x509.get()),
+                  "Failed to set certificate validity period: "));
   ASYLO_RETURN_IF_ERROR(
-      SetIssuerName(issuer.value(), x509.get())
-          .WithPrependedContext("Failed to set certificate issuer name: "));
-  ASYLO_RETURN_IF_ERROR(
-      SetValidity(validity.value(), x509.get())
-          .WithPrependedContext("Failed to set certificate validity period: "));
-  ASYLO_RETURN_IF_ERROR(
-      SetSubjectName(subject.value(), x509.get())
-          .WithPrependedContext("Failed to set certificate subject name: "));
-  ASYLO_RETURN_IF_ERROR(
-      SetSubjectPublicKey(subject_public_key_der.value(), x509.get())
-          .WithPrependedContext(
-              "Failed to set certificate subject public key: "));
+      WithContext(SetSubjectName(subject.value(), x509.get()),
+                  "Failed to set certificate subject name: "));
+  ASYLO_RETURN_IF_ERROR(WithContext(
+      SetSubjectPublicKey(subject_public_key_der.value(), x509.get()),
+      "Failed to set certificate subject public key: "));
   if (authority_key_identifier.has_value()) {
-    ASYLO_RETURN_IF_ERROR(
-        SetAuthorityKeyId(authority_key_identifier.value(), x509.get())
-            .WithPrependedContext("Failed to set authority key identifier: "));
+    ASYLO_RETURN_IF_ERROR(WithContext(
+        SetAuthorityKeyId(authority_key_identifier.value(), x509.get()),
+        "Failed to set authority key identifier: "));
   }
   if (subject_key_identifier_method.has_value()) {
-    ASYLO_RETURN_IF_ERROR(
-        SetSubjectKeyId(subject_key_identifier_method.value(), x509.get())
-            .WithPrependedContext("Failed to set subject key identifier: "));
+    ASYLO_RETURN_IF_ERROR(WithContext(
+        SetSubjectKeyId(subject_key_identifier_method.value(), x509.get()),
+        "Failed to set subject key identifier: "));
   }
   if (key_usage.has_value()) {
     ASYLO_RETURN_IF_ERROR(
-        SetKeyUsage(key_usage.value(), x509.get())
-            .WithPrependedContext("Failed to set certificate key usage: "));
+        WithContext(SetKeyUsage(key_usage.value(), x509.get()),
+                    "Failed to set certificate key usage: "));
   }
   if (basic_constraints.has_value()) {
     ASYLO_RETURN_IF_ERROR(
-        SetBasicConstraints(basic_constraints.value(), x509.get())
-            .WithPrependedContext(
-                "Failed to set certificate basic constraints: "));
+        WithContext(SetBasicConstraints(basic_constraints.value(), x509.get()),
+                    "Failed to set certificate basic constraints: "));
   }
   if (crl_distribution_points.has_value()) {
-    ASYLO_RETURN_IF_ERROR(
-        SetCrlDistributionPoints(crl_distribution_points.value(), x509.get())
-            .WithPrependedContext(
-                "Failed to set certificate CRL distribution points: "));
+    ASYLO_RETURN_IF_ERROR(WithContext(
+        SetCrlDistributionPoints(crl_distribution_points.value(), x509.get()),
+        "Failed to set certificate CRL distribution points: "));
   }
-  ASYLO_RETURN_IF_ERROR(
-      AddExtensions(absl::MakeConstSpan(other_extensions), x509.get())
-          .WithPrependedContext("Failed to add certificate extensions: "));
-  ASYLO_RETURN_IF_ERROR(
-      issuer_key.SignX509(x509.get())
-          .WithPrependedContext("Failed to sign certificate: "));
+  ASYLO_RETURN_IF_ERROR(WithContext(
+      AddExtensions(absl::MakeConstSpan(other_extensions), x509.get()),
+      "Failed to add certificate extensions: "));
+  ASYLO_RETURN_IF_ERROR(WithContext(issuer_key.SignX509(x509.get()),
+                                    "Failed to sign certificate: "));
   return absl::WrapUnique(new X509Certificate(std::move(x509)));
+}
+
+StatusOr<std::string> X509CsrBuilder::SignAndBuild() const {
+  if (!subject.has_value()) {
+    return Status(absl::StatusCode::kInvalidArgument,
+                  "Cannot SignAndBuild without a subject");
+  }
+
+  if (key == nullptr) {
+    return Status(absl::StatusCode::kInvalidArgument,
+                  "Cannot SignAndBuild without a key");
+  }
+
+  bssl::UniquePtr<X509_REQ> x509_req(X509_REQ_new());
+  if (x509_req == nullptr) {
+    return Status(absl::StatusCode::kInternal, "Error allocating X509_REQ");
+  }
+
+  ASYLO_RETURN_IF_ERROR(SetVersion(version, x509_req.get()));
+
+  ASYLO_RETURN_IF_ERROR(SetSubjectName(subject.value(), x509_req.get()));
+
+  std::string public_key_der;
+  ASYLO_ASSIGN_OR_RETURN(public_key_der, key->SerializePublicKeyToDer());
+
+  ASYLO_RETURN_IF_ERROR(SetSubjectPublicKey(public_key_der, x509_req.get()));
+
+  ASYLO_RETURN_IF_ERROR(
+      WithContext(key->SignX509Req(x509_req.get()), "Failed to sign CSR: "));
+
+  return ToPemEncoding(x509_req.get());
 }
 
 StatusOr<std::unique_ptr<X509Certificate>> X509Certificate::Create(
@@ -823,21 +914,12 @@ StatusOr<bssl::UniquePtr<X509_REQ>> CertificateSigningRequestToX509Req(
 
 StatusOr<CertificateSigningRequest> X509ReqToDerCertificateSigningRequest(
     const X509_REQ &x509_req) {
-  bssl::UniquePtr<BIO> x509_bio(BIO_new(BIO_s_mem()));
-  if (i2d_X509_REQ_bio(x509_bio.get(), const_cast<X509_REQ *>(&x509_req)) !=
-      1) {
-    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
-  }
-
-  char *data;
-  long length = BIO_get_mem_data(x509_bio.get(), &data);
-  if (length <= 0) {
-    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
-  }
+  std::string der;
+  ASYLO_ASSIGN_OR_RETURN(der, ToDerEncoding(const_cast<X509_REQ *>(&x509_req)));
 
   CertificateSigningRequest csr;
   csr.set_format(CertificateSigningRequest::PKCS10_DER);
-  csr.set_data(data, length);
+  csr.set_data(der);
   return csr;
 }
 
@@ -897,7 +979,7 @@ Status X509Certificate::Verify(const CertificateInterface &issuer_certificate,
     }
   }
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 StatusOr<std::string> X509Certificate::SubjectKeyDer() const {
@@ -948,7 +1030,7 @@ absl::optional<int64_t> X509Certificate::CertPathLength() const {
     return absl::nullopt;
   }
   absl::optional<BasicConstraints> basic_constraints =
-      basic_constraints_result.ValueOrDie();
+      basic_constraints_result.value();
   return basic_constraints.has_value() ? basic_constraints->pathlen
                                        : absl::nullopt;
 }

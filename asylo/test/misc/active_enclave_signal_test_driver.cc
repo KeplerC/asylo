@@ -24,12 +24,13 @@
 #include <unistd.h>
 
 #include <gtest/gtest.h>
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
 #include "asylo/test/misc/signal_test.pb.h"
 #include "asylo/test/util/enclave_test.h"
 #include "asylo/test/util/status_matchers.h"
-#include "asylo/util/posix_error_space.h"
+#include "asylo/util/posix_errors.h"
 #include "asylo/util/status.h"
 
 namespace asylo {
@@ -101,9 +102,7 @@ class ActiveEnclaveSignalTest : public EnclaveTest {
     run_enclave_thread_input.enclave_input = enclave_input;
     if (pthread_create(&enclave_thread, nullptr, RunEnclave,
                        &run_enclave_thread_input) != 0) {
-      return Status(
-          static_cast<error::PosixError>(errno),
-          absl::StrCat("Failed to create enclave thread: ", strerror(errno)));
+      return LastPosixError("Failed to create enclave thread");
     }
     pthread_t signal_thread;
     SendSignalThreadInput send_signal_thread_input;
@@ -113,21 +112,15 @@ class ActiveEnclaveSignalTest : public EnclaveTest {
         enclave_input.GetExtension(signal_test_input).signal_test_type();
     if (pthread_create(&signal_thread, nullptr, SendSignal,
                        &send_signal_thread_input) != 0) {
-      return Status(static_cast<error::PosixError>(errno),
-                    absl::StrCat("Failed to create send signal thread: ",
-                                 strerror(errno)));
+      return LastPosixError("Failed to create send signal thread");
     }
     if (pthread_join(signal_thread, nullptr) != 0) {
-      return Status(
-          static_cast<error::PosixError>(errno),
-          absl::StrCat("Failed to join send signal thread: ", strerror(errno)));
+      return LastPosixError("Failed to join send signal thread");
     }
     if (pthread_join(enclave_thread, nullptr) != 0) {
-      return Status(
-          static_cast<error::PosixError>(errno),
-          absl::StrCat("Failed to join enclave thread: ", strerror(errno)));
+      return LastPosixError("Failed to join enclave thread");
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 };
 

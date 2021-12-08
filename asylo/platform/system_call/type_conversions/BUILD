@@ -76,6 +76,7 @@ cc_binary(
     copts = ASYLO_DEFAULT_COPTS,
     deps = [
         "//asylo/util:logging",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
         "@com_google_absl//absl/strings",
@@ -124,6 +125,7 @@ cc_library(
     deps = [
         ":types_definitions",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -136,6 +138,7 @@ cc_test_and_cc_enclave_test(
         ":types_functions",
         "//asylo/test/util:finite_domain_fuzz",
         "//asylo/test/util:test_main",
+        "@com_google_absl//absl/random",
         "@com_google_googletest//:gtest",
     ],
 )

@@ -38,7 +38,7 @@ cc_library(
     deps = [
         "//asylo/platform/primitives",
         "//asylo/util:status",
-        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -49,7 +49,7 @@ cc_test(
     deps = [
         ":status_conversions",
         "//asylo/test/util:test_main",
-        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest",
     ],
 )
@@ -67,7 +67,6 @@ cc_library(
         "//asylo/util:mutex_guarded",
         "//asylo/util:status",
         "//asylo/util:status_macros",
-        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/types:optional",
     ],
@@ -83,6 +82,7 @@ cc_library(
         ":dispatch_table",
         "//asylo/util:status",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/time",
     ],
 )

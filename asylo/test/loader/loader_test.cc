@@ -37,19 +37,19 @@ class TestClient : public EnclaveClient {
 
   Status EnterAndRun(const EnclaveInput &input,
                      EnclaveOutput *output) override {
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
  private:
   Status EnterAndInitialize(const EnclaveConfig &config) override {
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   Status EnterAndFinalize(const EnclaveFinal &final_input) override {
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
-  Status DestroyEnclave() override { return Status::OkStatus(); }
+  Status DestroyEnclave() override { return absl::OkStatus(); }
 };
 
 // Loader which always fails for testing.
@@ -97,7 +97,7 @@ class LoaderTest : public ::testing::Test {
     if (!manager_result.ok()) {
       LOG(FATAL) << manager_result.status();
     }
-    manager_ = manager_result.ValueOrDie();
+    manager_ = manager_result.value();
   }
 
   EnclaveManager *manager_;

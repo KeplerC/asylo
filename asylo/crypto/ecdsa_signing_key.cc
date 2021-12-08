@@ -18,6 +18,7 @@
 
 #include <openssl/base.h>
 #include <openssl/ec.h>
+#include <openssl/ec_key.h>
 
 #include <cstdint>
 #include <string>
@@ -26,6 +27,7 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "asylo/crypto/util/bssl_util.h"
 #include "asylo/crypto/util/byte_container_view.h"
 #include "asylo/util/statusor.h"
 
@@ -34,14 +36,34 @@ namespace internal {
 
 // Returns an EC_KEY containing the public key corresponding to |private_key|.
 StatusOr<bssl::UniquePtr<EC_KEY>> CreatePublicKeyFromPrivateKey(
-    const EC_KEY *private_key, int nid) {
+    EC_KEY *private_key, int nid) {
   bssl::UniquePtr<EC_KEY> public_key(EC_KEY_new_by_curve_name(nid));
   if (!public_key) {
-    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+    return Status(
+        absl::StatusCode::kInternal,
+        absl::StrCat("Error creating public key: ", BsslLastErrorString()));
+  }
+  if (EC_KEY_get0_public_key(private_key) == nullptr) {
+    bssl::UniquePtr<EC_POINT> key_point(
+        EC_POINT_new(EC_KEY_get0_group(private_key)));
+    if (!EC_POINT_mul(EC_KEY_get0_group(private_key), key_point.get(),
+                      EC_KEY_get0_private_key(private_key), /*q=*/nullptr,
+                      /*m=*/nullptr, /*ctx=*/nullptr)) {
+      return Status(
+          absl::StatusCode::kInternal,
+          absl::StrCat("Error computing public key: ", BsslLastErrorString()));
+    }
+    if (!EC_KEY_set_public_key(private_key, key_point.get())) {
+      return Status(absl::StatusCode::kInternal,
+                    absl::StrCat("Error setting computed public key: ",
+                                 BsslLastErrorString()));
+    }
   }
   if (!EC_KEY_set_public_key(public_key.get(),
                              EC_KEY_get0_public_key(private_key))) {
-    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+    return Status(
+        absl::StatusCode::kInternal,
+        absl::StrCat("Error setting public key: ", BsslLastErrorString()));
   }
 
   return std::move(public_key);
@@ -67,7 +89,7 @@ Status CheckKeyProtoValues(const AsymmetricSigningKeyProto &key_proto,
                         ProtoEnumValueName(key_proto.signature_scheme()),
                         ProtoEnumValueName(signature_scheme)));
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 StatusOr<bssl::UniquePtr<EC_KEY>> GetPublicEcKeyFromDer(
@@ -140,7 +162,7 @@ bool PublicKeyCompare(const EC_KEY *key1, const EC_KEY *key2) {
          (EC_POINT_cmp(group, point, other_point, /*ctx=*/nullptr) == 0);
 }
 
-StatusOr<std::string> SerializePublicKeyToDer(const EC_KEY *public_key) {
+StatusOr<std::string> BsslSerializePublicKeyToDer(const EC_KEY *public_key) {
   uint8_t *key = nullptr;
   int length = i2d_EC_PUBKEY(public_key, &key);
   if (length <= 0) {
@@ -150,7 +172,7 @@ StatusOr<std::string> SerializePublicKeyToDer(const EC_KEY *public_key) {
   return std::string(reinterpret_cast<char *>(key), length);
 }
 
-StatusOr<std::string> SerializePublicKeyToPem(EC_KEY *public_key) {
+StatusOr<std::string> BsslSerializePublicKeyToPem(EC_KEY *public_key) {
   bssl::UniquePtr<BIO> key_bio(BIO_new(BIO_s_mem()));
   if (!PEM_write_bio_EC_PUBKEY(key_bio.get(), public_key)) {
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
@@ -172,7 +194,7 @@ Status VerifyEcdsa(ByteContainerView digest, ByteContainerView signature,
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status VerifyEcdsaWithRS(ByteContainerView r, ByteContainerView s,
@@ -192,7 +214,7 @@ Status VerifyEcdsaWithRS(ByteContainerView r, ByteContainerView s,
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 StatusOr<bssl::UniquePtr<EC_KEY>> CreatePrivateEcKey(int nid) {
@@ -248,7 +270,20 @@ StatusOr<bssl::UniquePtr<EC_KEY>> CreatePrivateEcKeyFromPem(
   return std::move(key);
 }
 
-StatusOr<CleansingVector<uint8_t>> SerializePrivateKeyToDer(
+StatusOr<bssl::UniquePtr<EC_KEY>> CreatePrivateEcKeyFromScalar(
+    int nid, const BIGNUM *scalar) {
+  bssl::UniquePtr<EC_KEY> key(EC_KEY_new_by_curve_name(nid));
+  if (!key) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
+  if (!EC_KEY_set_private_key(key.get(), scalar)) {
+    return Status(absl::StatusCode::kInternal, BsslLastErrorString());
+  }
+
+  return std::move(key);
+}
+
+StatusOr<CleansingVector<uint8_t>> BsslSerializePrivateKeyToDer(
     const EC_KEY *private_key) {
   CBB buffer;
   if (!CBB_init(&buffer, /*initial_capacity=*/0) ||
@@ -270,7 +305,8 @@ StatusOr<CleansingVector<uint8_t>> SerializePrivateKeyToDer(
   return serialized_key;
 }
 
-StatusOr<CleansingVector<char>> SerializePrivateKeyToPem(EC_KEY *private_key) {
+StatusOr<CleansingVector<char>> BsslSerializePrivateKeyToPem(
+    EC_KEY *private_key) {
   bssl::UniquePtr<BIO> key_bio(BIO_new(BIO_s_mem()));
   if (!PEM_write_bio_ECPrivateKey(key_bio.get(), private_key,
                                   /*enc=*/nullptr, /*kstr=*/nullptr, /*klen=*/0,
@@ -305,7 +341,7 @@ Status EcdsaSign(std::vector<uint8_t> *signature, ByteContainerView digest,
     return Status(absl::StatusCode::kInternal, BsslLastErrorString());
   }
   signature->resize(signature_size);
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 Status EcdsaSignDigestAndSetRS(SignatureScheme sig_scheme,
@@ -342,7 +378,7 @@ Status EcdsaSignDigestAndSetRS(SignatureScheme sig_scheme,
   signature->set_signature_scheme(sig_scheme);
   *signature->mutable_ecdsa_signature() = std::move(ecdsa_signature);
 
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 StatusOr<std::pair<bssl::UniquePtr<BIGNUM>, bssl::UniquePtr<BIGNUM>>>

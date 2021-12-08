@@ -61,17 +61,17 @@ class IntelEcdsaQuoteTest : public Test {
   void ExpectQuoteEquals(const StatusOr<IntelQeQuote> &actual_quote,
                          const IntelQeQuote &expected_quote) {
     ASYLO_ASSERT_OK(actual_quote);
-    EXPECT_THAT(actual_quote.ValueOrDie().header,
+    EXPECT_THAT(actual_quote.value().header,
                 TrivialObjectEq(expected_quote.header));
-    EXPECT_THAT(actual_quote.ValueOrDie().body,
+    EXPECT_THAT(actual_quote.value().body,
                 TrivialObjectEq(expected_quote.body));
-    EXPECT_THAT(actual_quote.ValueOrDie().signature,
+    EXPECT_THAT(actual_quote.value().signature,
                 TrivialObjectEq(expected_quote.signature));
-    EXPECT_THAT(actual_quote.ValueOrDie().qe_authn_data,
+    EXPECT_THAT(actual_quote.value().qe_authn_data,
                 ContainerEq(expected_quote.qe_authn_data));
-    EXPECT_THAT(actual_quote.ValueOrDie().cert_data.qe_cert_data_type,
+    EXPECT_THAT(actual_quote.value().cert_data.qe_cert_data_type,
                 Eq(expected_quote.cert_data.qe_cert_data_type));
-    EXPECT_THAT(actual_quote.ValueOrDie().cert_data.qe_cert_data,
+    EXPECT_THAT(actual_quote.value().cert_data.qe_cert_data,
                 ContainerEq(expected_quote.cert_data.qe_cert_data));
   }
 };
@@ -94,10 +94,8 @@ TEST_F(IntelEcdsaQuoteTest, ParseQuoteFailsDueToInputBufferBeingTooLarge) {
   packed_quote.push_back('x');
 
   Status status = ParseDcapPackedQuote(packed_quote).status();
-  EXPECT_THAT(status, StatusIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(
-      std::string(status.error_message().begin(), status.error_message().end()),
-      HasSubstr("Expected signature data size of "));
+  EXPECT_THAT(status, StatusIs(absl::StatusCode::kInvalidArgument,
+                               HasSubstr("Expected signature data size of ")));
 }
 
 TEST_F(IntelEcdsaQuoteTest, ParseQuoteFailsDueToInputBufferBeingTooSmall) {

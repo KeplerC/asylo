@@ -17,14 +17,16 @@
  */
 
 #include <sys/select.h>
+
 #include <algorithm>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "asylo/platform/storage/utils/fd_closer.h"
 #include "asylo/test/util/status_matchers.h"
-#include "asylo/util/posix_error_space.h"
+#include "asylo/util/posix_errors.h"
 
 namespace asylo {
 namespace {
@@ -40,12 +42,11 @@ class SelectTest : public ::testing::Test {
     while (bytes_left > 0) {
       ssize_t bytes_written = write(fd, message, bytes_left);
       if (bytes_written < 0) {
-        return Status(static_cast<error::PosixError>(errno),
-                      absl::StrCat("write failed: ", strerror(errno)));
+        return LastPosixError("write failed");
       }
       bytes_left -= bytes_written;
     }
-    return Status::OkStatus();
+    return absl::OkStatus();
   }
 
   void RunSelectTest(bool is_read_test) {

@@ -20,6 +20,7 @@
 
 #include <ifaddrs.h>
 
+#include "absl/status/status.h"
 #include "asylo/platform/primitives/primitive_status.h"
 #include "asylo/platform/system_call/type_conversions/types_functions.h"
 #include "asylo/util/status_macros.h"
@@ -111,6 +112,9 @@ bool IsIfAddrSupported(const struct ifaddrs *entry) {
   if (entry->ifa_ifu.ifu_dstaddr && !IpCompliant(entry->ifa_ifu.ifu_dstaddr)) {
     return false;
   }
+  if (!TokLinuxIffFlag(entry->ifa_flags, /*ignore_unexpected_bits=*/true)) {
+    return false;
+  }
   return true;
 }
 
@@ -139,19 +143,23 @@ bool DeserializeAddrinfo(primitives::MessageReader *in, struct addrinfo **out,
     }
     memset(info, 0, sizeof(struct addrinfo));
 
-    info->ai_flags = FromkLinuxAddressInfoFlag(in->next<int>());
-    info->ai_family = FromkLinuxAfFamily(in->next<int>());
-    info->ai_socktype = FromkLinuxSocketType(in->next<int>());
+    absl::optional<int> ai_flags = FromkLinuxAddressInfoFlag(in->next<int>());
+    absl::optional<int> ai_family = FromkLinuxAfFamily(in->next<int>());
+    absl::optional<int> ai_socktype = FromkLinuxSocketType(in->next<int>());
     info->ai_protocol = in->next<int>();
     Extent klinux_sockaddr_buf = in->next();
     Extent ai_canonname = in->next();
 
-    if (info->ai_socktype == -1) {
+    if (!ai_flags || !ai_family || !ai_socktype) {
       // Roll back info and linked list constructed until now.
       freeaddrinfo(info);
       freeaddrinfo(*out);
       return false;
     }
+
+    info->ai_flags = *ai_flags;
+    info->ai_family = *ai_family;
+    info->ai_socktype = *ai_socktype;
 
     // Optionally set ai_addr and ai_addrlen.
     if (!klinux_sockaddr_buf.empty()) {
@@ -217,13 +225,21 @@ bool DeserializeIfAddrs(primitives::MessageReader *in, struct ifaddrs **out,
     }
 
     Extent ifa_name_buf = in->next();
-    auto klinux_ifa_flags = in->next<unsigned int>();
+    int klinux_flags = in->next<unsigned int>();
+    absl::optional<int> ifa_flags = FromkLinuxIffFlag(klinux_flags);
     Extent klinux_ifa_addr_buf = in->next();
     Extent klinux_ifa_netmask_buf = in->next();
     Extent klinux_ifa_dstaddr_buf = in->next();
 
+    if (!ifa_flags) {
+      // Roll back info and linked list constructed until now.
+      freeifaddrs(addrs);
+      freeifaddrs(*out);
+      return false;
+    }
+
     addrs->ifa_name = strdup(ifa_name_buf.As<char>());
-    addrs->ifa_flags = FromkLinuxIffFlag(klinux_ifa_flags);
+    addrs->ifa_flags = *ifa_flags;
     addrs->ifa_data = nullptr;  // Unsupported
 
     // Optionally set addrs->ifa_addr.
@@ -308,9 +324,18 @@ PrimitiveStatus SerializeAddrInfo(primitives::MessageWriter *writer,
 
   for (struct addrinfo *addr = addrs; addr != nullptr; addr = addr->ai_next) {
     // We push 6 entries per addrinfo to output.
-    writer->Push<int>(TokLinuxAddressInfoFlag(addr->ai_flags));
-    writer->Push<int>(TokLinuxAfFamily(addr->ai_family));
-    writer->Push<int>(TokLinuxSocketType(addr->ai_socktype));
+    absl::optional<int> ai_flags = TokLinuxAddressInfoFlag(addr->ai_flags);
+    absl::optional<int> ai_family = TokLinuxAfFamily(addr->ai_family);
+    absl::optional<int> ai_socktype = TokLinuxSocketType(addr->ai_socktype);
+    if (!ai_flags || !ai_family || !ai_socktype) {
+      return {error::GoogleError::INVALID_ARGUMENT,
+              "SerializeAddrInfo: Couldn't convert addrinfo fields to klinux "
+              "values"};
+    }
+
+    writer->Push<int>(*ai_flags);
+    writer->Push<int>(*ai_family);
+    writer->Push<int>(*ai_socktype);
     writer->Push<int>(addr->ai_protocol);
 
     if (!explicit_klinux_conversion) {
@@ -354,11 +379,16 @@ PrimitiveStatus SerializeIfAddrs(primitives::MessageWriter *writer,
   for (struct ifaddrs *addr = ifaddr_list; addr != nullptr;
        addr = addr->ifa_next) {
     // If the entry is of a format we don't support, don't include it.
-    if (!IsIfAddrSupported(addr)) continue;
+    if (!IsIfAddrSupported(addr)) {
+      continue;
+    }
 
     // We push 5 entries per ifaddr to output.
     writer->PushString(addr->ifa_name);
-    writer->Push<uint32_t>(TokLinuxIffFlag(addr->ifa_flags));
+
+    // TokLinuxIffFlag was checked for validity in IsIfAddrSupported.
+    writer->Push<uint32_t>(
+        *TokLinuxIffFlag(addr->ifa_flags, /*ignore_unexpected_bits=*/true));
 
     if (!explicit_klinux_conversion) {
       ASYLO_RETURN_IF_ERROR(writer->PushSockAddr(addr->ifa_addr));
@@ -416,11 +446,13 @@ bool SerializenotifyEvents(const char *buf, size_t buf_len, char **out,
   char *curr_event_ptr = const_cast<char *>(buf);
   while (curr_event_ptr < buf + buf_len) {
     auto *curr_event = reinterpret_cast<struct inotify_event *>(curr_event_ptr);
-    writer.Push<int>(curr_event->wd);
-    writer.Push<uint32_t>(TokLinuxInotifyEventMask(curr_event->mask));
-    writer.Push<uint32_t>(curr_event->cookie);
-    writer.PushString(curr_event->name, curr_event->len);
-
+    absl::optional<uint32_t> mask = TokLinuxInotifyEventMask(curr_event->mask);
+    if (mask) {
+      writer.Push<int>(curr_event->wd);
+      writer.Push<uint32_t>(*mask);
+      writer.Push<uint32_t>(curr_event->cookie);
+      writer.PushString(curr_event->name, curr_event->len);
+    }
     curr_event_ptr += sizeof(struct inotify_event) + curr_event->len;
   }
 
@@ -446,21 +478,24 @@ bool DeserializeInotifyEvents(const char *buf, size_t buf_len,
 
   for (int i = 0; i < reader.size(); i += 4) {
     int wd = reader.next<int>();
-    uint32_t mask = FromkLinuxInotifyEventMask(reader.next<uint32_t>());
+    absl::optional<uint32_t> mask =
+        FromkLinuxInotifyEventMask(reader.next<uint32_t>());
     uint32_t cookie = reader.next<uint32_t>();
     Extent name_buf = reader.next();
 
-    auto *new_event_struct = static_cast<struct inotify_event *>(
-        malloc(sizeof(struct inotify_event) + name_buf.size()));
-    new_event_struct->wd = wd;
-    new_event_struct->mask = mask;
-    new_event_struct->cookie = cookie;
-    new_event_struct->len = name_buf.size();
-    if (!name_buf.empty()) {
-      memcpy(new_event_struct->name, name_buf.As<char>(), name_buf.size());
-    }
+    if (mask) {
+      auto *new_event_struct = static_cast<struct inotify_event *>(
+          malloc(sizeof(struct inotify_event) + name_buf.size()));
+      new_event_struct->wd = wd;
+      new_event_struct->mask = *mask;
+      new_event_struct->cookie = cookie;
+      new_event_struct->len = name_buf.size();
+      if (!name_buf.empty()) {
+        memcpy(new_event_struct->name, name_buf.As<char>(), name_buf.size());
+      }
 
-    events->push(new_event_struct);
+      events->push(new_event_struct);
+    }
   }
   return true;
 }

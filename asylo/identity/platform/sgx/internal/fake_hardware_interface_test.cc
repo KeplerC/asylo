@@ -36,7 +36,7 @@
 #include "asylo/identity/platform/sgx/internal/secs_attributes.h"
 #include "asylo/identity/platform/sgx/internal/self_identity.h"
 #include "asylo/identity/platform/sgx/miscselect_util.h"
-#include "asylo/platform/primitives/sgx/sgx_error_space.h"
+#include "asylo/platform/primitives/sgx/sgx_error_matchers.h"
 #include "asylo/test/util/proto_matchers.h"
 #include "asylo/test/util/status_matchers.h"
 
@@ -100,7 +100,7 @@ void TestKeyDerivationChangesWithMrenclave(Keyrequest *request) {
     // set.
     bool expect_key_change =
         (request->keypolicy & kKeypolicyMrenclaveBitMask) != 0;
-    EXPECT_EQ(key1.ValueOrDie() != key2.ValueOrDie(), expect_key_change)
+    EXPECT_EQ(key1.value() != key2.value(), expect_key_change)
         << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
   }
 }
@@ -132,7 +132,7 @@ void TestKeyDerivationChangesWithMrsigner(Keyrequest *request) {
     // is set.
     bool expect_key_change =
         (request->keypolicy & kKeypolicyMrsignerBitMask) != 0;
-    EXPECT_EQ(key1.ValueOrDie() != key2.ValueOrDie(), expect_key_change)
+    EXPECT_EQ(key1.value() != key2.value(), expect_key_change)
         << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
   }
 }
@@ -165,7 +165,7 @@ void TestKeyDerivationChangesWithIsvprodid(Keyrequest *request) {
     bool expect_key_change =
         (enclave->get_isvprodid() != prev_isvprodid) &&
         ((request->keypolicy & kKeypolicyNoisvprodidBitMask) == 0);
-    EXPECT_EQ(key1.ValueOrDie() != key2.ValueOrDie(), expect_key_change)
+    EXPECT_EQ(key1.value() != key2.value(), expect_key_change)
         << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
   }
 }
@@ -199,7 +199,7 @@ void TestKeyDerivationChangesWithIsvsvn(Keyrequest *request) {
     // A key change is expected if and only if the new ISVSVN value is different
     // than the old value.
     bool expect_key_change = (isvsvn != prev_isvsvn);
-    EXPECT_EQ(key1.ValueOrDie() != key2.ValueOrDie(), expect_key_change)
+    EXPECT_EQ(key1.value() != key2.value(), expect_key_change)
         << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
   }
 }
@@ -241,7 +241,7 @@ void TestKeyDerivationChangesWithAttributes(Keyrequest *request) {
     // KEYPOLICY mask have changed.
     bool expect_key_change =
         (prev & ~do_not_care_attributes) != (next & ~do_not_care_attributes);
-    EXPECT_EQ(key1.ValueOrDie() != key2.ValueOrDie(), expect_key_change)
+    EXPECT_EQ(key1.value() != key2.value(), expect_key_change)
         << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
   }
 }
@@ -273,7 +273,7 @@ void TestKeyDerivationChangesWithMiscselect(Keyrequest *request) {
     // Since the MISCMASK is set to all 1s, a key change is expected if and only
     // if the new MISCSELECT is different than the old one.
     bool expect_key_change = (prev != enclave->get_miscselect());
-    EXPECT_EQ(key1.ValueOrDie() != key2.ValueOrDie(), expect_key_change)
+    EXPECT_EQ(key1.value() != key2.value(), expect_key_change)
         << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
   }
 }
@@ -309,7 +309,7 @@ void TestKeyDerivationChangesWithIsvfamilyid(Keyrequest *request) {
     bool expect_key_change =
         (isvfamilyid != prev_isvfamilyid) &&
         ((request->keypolicy & kKeypolicyIsvfamilyidBitMask) != 0);
-    EXPECT_EQ(key1.ValueOrDie() != key2.ValueOrDie(), expect_key_change)
+    EXPECT_EQ(key1.value() != key2.value(), expect_key_change)
         << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
   }
 }
@@ -346,7 +346,7 @@ void TestKeyDerivationChangesWithIsvextprodid(Keyrequest *request) {
     bool expect_key_change =
         (isvextprodid != prev_isvextprodid) &&
         ((request->keypolicy & kKeypolicyIsvextprodidBitMask) != 0);
-    EXPECT_EQ(key1.ValueOrDie() != key2.ValueOrDie(), expect_key_change)
+    EXPECT_EQ(key1.value() != key2.value(), expect_key_change)
         << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
   }
 }
@@ -382,7 +382,7 @@ void TestKeyDerivationChangesWithConfigid(Keyrequest *request) {
     bool expect_key_change =
         (configid != prev_configid) &&
         ((request->keypolicy & kKeypolicyConfigidBitMask) != 0);
-    EXPECT_EQ(key1.ValueOrDie() != key2.ValueOrDie(), expect_key_change)
+    EXPECT_EQ(key1.value() != key2.value(), expect_key_change)
         << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
   }
 }
@@ -420,7 +420,7 @@ void TestKeyDerivationChangesWithConfigsvn(Keyrequest *request) {
     bool expect_key_change =
         (configsvn != prev_configsvn) &&
         ((request->keypolicy & kKeypolicyConfigidBitMask) != 0);
-    EXPECT_EQ(key1.ValueOrDie() != key2.ValueOrDie(), expect_key_change)
+    EXPECT_EQ(key1.value() != key2.value(), expect_key_change)
         << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
   }
 }
@@ -448,7 +448,7 @@ void TestKeyIsvsvnAccessControl(Keyrequest *request) {
   // Request a key corresponding to a higher ISVSVN.
   request->isvsvn = enclave->get_isvsvn() + 1;
   key = hardware->GetKey(*request);
-  EXPECT_THAT(key, StatusIs(SGX_ERROR_INVALID_ISVSVN))
+  EXPECT_THAT(key, SgxErrorIs(SGX_ERROR_INVALID_ISVSVN))
       << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
 }
 
@@ -475,7 +475,7 @@ void TestKeyConfigsvnAccessControl(Keyrequest *request) {
   // Request a key corresponding to a higher CONFIGSVN.
   request->configsvn = enclave->get_configsvn() + 1;
   key = hardware->GetKey(*request);
-  EXPECT_THAT(key, StatusIs(SGX_ERROR_INVALID_ISVSVN))
+  EXPECT_THAT(key, SgxErrorIs(SGX_ERROR_INVALID_ISVSVN))
       << HexDumpObjectPair("Enclave", *enclave, "Keyrequest", *request);
 }
 

@@ -21,6 +21,7 @@
 // For |domainname| field in pipe2().
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#include "absl/status/status.h"
 #endif
 
 #include <sys/file.h>
@@ -47,7 +48,7 @@
 #include "asylo/platform/primitives/util/message.h"
 #include "asylo/platform/storage/utils/fd_closer.h"
 #include "asylo/platform/system_call/type_conversions/types_functions.h"
-#include "asylo/util/posix_error_space.h"
+#include "asylo/util/posix_errors.h"
 #include "asylo/util/status.h"
 #include "asylo/util/status_macros.h"
 #include "QuoteGeneration/quote_wrapper/common/inc/sgx_ql_lib_common.h"
@@ -65,19 +66,13 @@ static void (*handle_signal_inside_enclave)(int, klinux_siginfo_t *,
 // Calls the function registered as the signal handler inside the enclave.
 void TranslateToBridgeAndHandleSignal(int klinux_signum, siginfo_t *info,
                                       void *ucontext) {
-  if (klinux_signum < 0) {
-    // Invalid incoming signal number.
-    return;
-  }
-
   // |info| is handled inside the enclave via the function pointer
   // |handle_signal_inside_enclave|, and therefore needs to have a consistent
   // type inside and outside the enclave. We utilize our definition of
   // klinux_siginfo_t for this purpose, instead of defining a new "bridge" type.
-  klinux_siginfo_t klinux_siginfo;
-  if (!TokLinuxSiginfo(info, &klinux_siginfo)) {
-    return;
-  }
+  klinux_siginfo_t klinux_siginfo = {};
+  klinux_siginfo.si_signo = info->si_signo;
+  klinux_siginfo.si_code = info->si_code;
 
   if (handle_signal_inside_enclave) {
     handle_signal_inside_enclave(klinux_signum, &klinux_siginfo, ucontext);
@@ -133,8 +128,7 @@ asylo::Status DoSnapshotKeyTransfer(int self_socket, int peer_socket,
   // Close the socket for the other side, and enters the enclave to send the
   // snapshot key through the socket.
   if (close(peer_socket) < 0) {
-    return asylo::Status(static_cast<asylo::error::PosixError>(errno),
-                         absl::StrCat("close failed: ", strerror(errno)));
+    return asylo::LastPosixError("close failed");
   }
 
   asylo::ForkHandshakeConfig fork_handshake_config;
@@ -145,7 +139,7 @@ asylo::Status DoSnapshotKeyTransfer(int self_socket, int peer_socket,
   ASYLO_RETURN_IF_ERROR(primitive_client->EnterAndTransferSecureSnapshotKey(
       fork_handshake_config));
 
-  return asylo::Status::OkStatus();
+  return absl::OkStatus();
 }
 
 // A helper class to free the snapshot memory allocated during fork.

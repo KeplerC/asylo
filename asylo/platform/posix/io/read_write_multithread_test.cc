@@ -30,13 +30,14 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "absl/flags/flag.h"
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
 #include "asylo/platform/common/memory.h"
 #include "asylo/test/util/status_matchers.h"
 #include "asylo/test/util/test_flags.h"
 #include "asylo/util/cleanup.h"
-#include "asylo/util/posix_error_space.h"
+#include "asylo/util/posix_errors.h"
 #include "asylo/util/status.h"
 
 namespace asylo {
@@ -58,8 +59,7 @@ std::string GenerateRandomString() {
 }
 
 Status GenerateErrorStatusFromErrno(const char *message, const char *path) {
-  return Status(static_cast<error::PosixError>(errno),
-                absl::StrCat(message, ":", path));
+  return LastPosixError(absl::StrCat(message, ":", path));
 }
 
 // Writes to and reads from a file, checking that the file includes expected
@@ -70,7 +70,7 @@ Status WriteRead(const char *path) {
   // Generate a random string so that each thread writes a different message.
   std::string message = GenerateRandomString();
   if (!path || !*path || message.empty()) {
-    return Status(error::PosixError::P_ENOMSG, "File path or message is empty");
+    return PosixError(ENOMSG, "File path or message is empty");
   }
 
   int fd = open(path, O_CREAT | O_RDWR | O_APPEND, 0644);
@@ -95,18 +95,18 @@ Status WriteRead(const char *path) {
     return GenerateErrorStatusFromErrno("Failed to read from file", path);
   }
   if (rc >= sizeof(buf) || rc < message.size()) {
-    return Status(
-        error::PosixError::P_EFAULT,
+    return PosixError(
+        EFAULT,
         absl::StrCat("Unexpected number of bytes read from file:", path));
   }
   if (!strstr(buf, message.c_str())) {
-    return Status(error::PosixError::P_EFAULT,
-                  absl::StrCat("Unexpected message read from file:", path));
+    return PosixError(EFAULT,
+                      absl::StrCat("Unexpected message read from file:", path));
   }
   if (close(fd) != 0) {
     return GenerateErrorStatusFromErrno("Failed to close file", path);
   }
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 TEST(ReadWriteMultiThreadTest, MultiThreadTest) {

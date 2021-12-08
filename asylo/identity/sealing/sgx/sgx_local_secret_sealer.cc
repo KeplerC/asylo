@@ -47,7 +47,7 @@ SgxLocalSecretSealer::CreateMrenclaveSecretSealer() {
       GetSelfSgxIdentity(), SgxIdentityMatchSpecOptions::DEFAULT);
   CHECK(expectation_status.ok())
       << "Failed to create default self identity expectation";
-  SgxIdentityExpectation expectation = expectation_status.ValueOrDie();
+  SgxIdentityExpectation expectation = expectation_status.value();
 
   // SgxIdentityMatchSpecOptions::DEFAULT sets the expectation to match
   // MRSIGNER. The match bit needs to be flipped so that the LocalSecretSealer
@@ -70,7 +70,7 @@ SgxLocalSecretSealer::CreateMrsignerSecretSealer() {
       GetSelfSgxIdentity(), SgxIdentityMatchSpecOptions::DEFAULT);
   CHECK(expectation_status.ok())
       << "Failed to create default self identity expectation";
-  SgxIdentityExpectation expectation = expectation_status.ValueOrDie();
+  SgxIdentityExpectation expectation = expectation_status.value();
 
   return absl::WrapUnique<SgxLocalSecretSealer>(
       new SgxLocalSecretSealer(expectation));
@@ -102,7 +102,7 @@ Status SgxLocalSecretSealer::SetDefaultHeader(
                          SerializeSgxIdentity(GetSelfSgxIdentity()));
   ASYLO_ASSIGN_OR_RETURN(*header->mutable_client_acl()->mutable_expectation(),
                          SerializeSgxIdentityExpectation(default_client_acl_));
-  return Status::OkStatus();
+  return absl::OkStatus();
 }
 
 StatusOr<size_t> SgxLocalSecretSealer::MaxMessageSize(
