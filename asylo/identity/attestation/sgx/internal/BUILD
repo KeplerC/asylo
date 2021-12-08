@@ -575,7 +575,7 @@ cc_library(
     srcs = ["sgx_infrastructural_enclave_manager.cc"],
     hdrs = ["sgx_infrastructural_enclave_manager.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":attestation_key_certificate_impl",
         ":intel_architectural_enclave_interface",
@@ -640,7 +640,7 @@ cc_library(
         "sgx_infrastructural_enclave_manager.h",
     ],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":intel_architectural_enclave_interface",
         ":remote_assertion_generator_enclave_cc_proto",
@@ -701,10 +701,7 @@ cc_library(
     srcs = ["pce_util.cc"],
     hdrs = ["pce_util.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = [
-        "//asylo/identity/attestation/sgx:__subpackages__",
-        "//asylo/identity/provisioning/sgx:__subpackages__",
-    ],
+    visibility = ["//visibility:public"],
     deps = [
         "//asylo/crypto:algorithms_cc_proto",
         "//asylo/crypto:keys_cc_proto",
