@@ -215,7 +215,6 @@ cc_test(
 
 cc_library(
     name = "fake_sgx_pki",
-    testonly = 1,
     srcs = ["fake_sgx_pki.cc"],
     hdrs = ["fake_sgx_pki.h"],
     copts = ASYLO_DEFAULT_COPTS,
