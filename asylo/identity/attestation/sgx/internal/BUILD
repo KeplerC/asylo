@@ -32,7 +32,7 @@ load(
 
 licenses(["notice"])
 
-package(default_visibility = ["//asylo/identity/attestation/sgx:__subpackages__"])
+package(default_visibility = ["//visibility:public"])
 
 proto_library(
     name = "local_assertion_proto",
@@ -63,7 +63,7 @@ cc_proto_library(
 proto_library(
     name = "remote_assertion_generator_enclave_proto",
     srcs = ["remote_assertion_generator_enclave.proto"],
-    visibility = ["//visibility:private"],
+    visibility = ["//visibility:public"],
     deps = [
         ":remote_assertion_proto",
         "//asylo:enclave_proto",
@@ -78,7 +78,7 @@ proto_library(
 
 cc_proto_library(
     name = "remote_assertion_generator_enclave_cc_proto",
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = ["remote_assertion_generator_enclave_proto"],
 )
 
@@ -180,10 +180,7 @@ cc_library(
     srcs = ["fake_pce.cc"],
     hdrs = ["fake_pce.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = [
-        "//asylo/identity/attestation/sgx:__pkg__",
-        "//asylo/test/grpc:__pkg__",
-    ],
+    visibility = ["//visibility:public"],
     deps = [
         ":intel_architectural_enclave_interface",
         ":pce_util",
@@ -269,10 +266,7 @@ cc_library(
     srcs = ["dcap_intel_architectural_enclave_path_setter.cc"],
     hdrs = ["dcap_intel_architectural_enclave_path_setter.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = [
-        "//asylo/identity/attestation/sgx:__subpackages__",
-        "//asylo/identity/provisioning/sgx:__subpackages__",
-    ],
+    visibility = ["//visibility:public"],
     deps = [
         ":dcap_intel_architectural_enclave_interface",
         ":host_dcap_library_interface",
@@ -289,7 +283,7 @@ cc_library(
     name = "dcap_library_interface",
     hdrs = ["dcap_library_interface.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         "//asylo/util:error_codes",
         "//asylo/util:status",
@@ -304,7 +298,7 @@ cc_library(
     srcs = ["host_dcap_library_interface.cc"],
     hdrs = ["host_dcap_library_interface.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility = ["//visibility:public"],
     deps = [
         ":dcap_library_interface",
         "@linux_sgx//:public",
@@ -337,7 +331,7 @@ cc_library(
     srcs = ["attestation_key_certificate_impl.cc"],
     hdrs = ["attestation_key_certificate_impl.h"],
     copts = ASYLO_DEFAULT_COPTS,
-    visibility = ["//asylo:implementation"],
+    visibility =["//visibility:public"],
     deps = [
         ":attestation_key_cc_proto",
         ":attestation_key_certificate_cc_proto",
